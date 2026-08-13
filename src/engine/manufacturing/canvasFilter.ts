@@ -7,13 +7,15 @@ import { BinaryMask } from '../types';
 export function filterBinaryMaskCanvas(
   mask: BinaryMask,
   minFeaturePhysicalSize: number, // in mm
-  pixelPerMm: number
+  pixelPerMm: number,
+  smoothing: number = 0 // 0 to 100
 ): BinaryMask {
   const { width, height, data } = mask;
 
-  if (minFeaturePhysicalSize <= 0 || pixelPerMm <= 0) return mask;
+  if (minFeaturePhysicalSize <= 0 || pixelPerMm <= 0 || smoothing <= 0) return mask;
 
-  const blurPx = (minFeaturePhysicalSize * pixelPerMm) / 4;
+  const maxBlurPx = (minFeaturePhysicalSize * pixelPerMm) / 4;
+  const blurPx = (smoothing / 100) * maxBlurPx;
   if (blurPx < 0.5) return mask;
 
   const canvas = document.createElement('canvas');

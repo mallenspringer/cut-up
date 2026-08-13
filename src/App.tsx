@@ -286,7 +286,8 @@ export const App: React.FC = () => {
       const cleanMask = filterBinaryMaskCanvas(
         rawMask,
         deferredState.processing.minimumFeatureSize,
-        pxPerMm
+        pxPerMm,
+        deferredState.processing.smoothing
       );
 
       if (idx === 0) {

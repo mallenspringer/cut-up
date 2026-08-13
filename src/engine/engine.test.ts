@@ -6,6 +6,8 @@ import { generateAutoThresholds, createDefaultLayers } from './layers/layerGener
 import { generateCombinedSVG } from '../export/svgGenerator';
 import { zipSync, strToU8 } from 'fflate';
 
+import { filterBinaryMaskCanvas } from './manufacturing/canvasFilter';
+
 describe('Luminance Engine Core Tests', () => {
   it('1. Luminance & Thresholding determinism', () => {
     const buffer = {
@@ -88,5 +90,11 @@ describe('Luminance Engine Core Tests', () => {
     };
     const zipBuf = zipSync(zipFiles);
     expect(zipBuf.length).toBeGreaterThan(0);
+  });
+
+  it('6. Canvas Filter Smoothing Scaling', () => {
+    const mask: BinaryMask = { width: 4, height: 4, data: new Uint8Array([1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1]) };
+    const resultUnsmoothed = filterBinaryMaskCanvas(mask, 2.0, 4, 0);
+    expect(resultUnsmoothed.data).toEqual(mask.data); // Unsmoothed mask returns exact original mask reference
   });
 });
