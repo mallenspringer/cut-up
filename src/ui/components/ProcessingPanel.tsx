@@ -117,8 +117,11 @@ export const ProcessingPanel: React.FC<ProcessingPanelProps> = ({
           }}
         />
         <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-          <span>0 (Pixel Stair-step)</span>
-          <span>100 (Max Smooth Curves)</span>
+          <span>0 (Crisp / Raw Details)</span>
+          <span>100 (Max Cleanup & Curves)</span>
+        </div>
+        <div className="text-[11px] text-slate-400">
+          Wipes out high-frequency noise, speckles, & smooths organic contours.
         </div>
       </div>
     </div>

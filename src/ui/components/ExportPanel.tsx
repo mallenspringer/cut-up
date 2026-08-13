@@ -7,11 +7,13 @@ import { Download, Archive, Printer } from 'lucide-react';
 interface ExportPanelProps {
   state: AppState;
   layerPathDataMap: Map<string, string>;
+  processingResolution?: { width: number; height: number };
 }
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({
   state,
   layerPathDataMap,
+  processingResolution,
 }) => {
   const { canvas, layers, output } = state;
 
@@ -20,7 +22,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       layerPathDataMap,
       layers,
       canvas,
-      output.registrationMarks
+      output.registrationMarks,
+      processingResolution
     );
     exportCombinedSVGFile(svgContent, `cutup-combined-${Date.now()}.svg`);
   };
@@ -30,7 +33,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
       layerPathDataMap,
       layers,
       canvas,
-      output.registrationMarks
+      output.registrationMarks,
+      processingResolution
     );
   };
 

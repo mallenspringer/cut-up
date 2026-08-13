@@ -103,25 +103,32 @@ export function generateLayerMask(
   const total = width * height;
   const maskData = new Uint8Array(total);
 
-  if (!negative) {
-    for (let i = 0; i < total; i++) {
-      if (alpha && alpha[i] < 128) {
-        // Outside photo: solid paper (1) unioned into the layer sheet
-        maskData[i] = 1;
+  const isCumulative = mode === 'cumulative';
+
+  for (let i = 0; i < total; i++) {
+    if (alpha && alpha[i] < 128) {
+      // Outside photo: solid paper (1) unioned into the layer sheet
+      maskData[i] = 1;
+    } else {
+      const val = luminance[i];
+      let isCutout = false;
+
+      if (isCumulative) {
+        // Cumulative Mode: holes expand progressively on higher threshold layers
+        if (!negative) {
+          isCutout = val <= currThreshold;
+        } else {
+          isCutout = val > currThreshold;
+        }
       } else {
-        const val = luminance[i];
-        // Paper present for luminance within this layer's designated band
-        maskData[i] = (val >= (layerIndex === 0 ? minThresh : prevThreshold + 1) && val <= currThreshold) ? 1 : 0;
+        // Exclusive / Band Mode: cutout only for luminance within this layer's discrete band
+        const bandMin = layerIndex === 0 ? minThresh : prevThreshold + 1;
+        const inBand = val >= bandMin && val <= currThreshold;
+        isCutout = !negative ? inBand : !inBand;
       }
-    }
-  } else {
-    for (let i = 0; i < total; i++) {
-      if (alpha && alpha[i] < 128) {
-        maskData[i] = 1;
-      } else {
-        const val = luminance[i];
-        maskData[i] = (val < (layerIndex === 0 ? minThresh : prevThreshold + 1) || val > currThreshold) ? 1 : 0;
-      }
+
+      // Material mask: 1 = solid paper sheet, 0 = cutout hole
+      maskData[i] = isCutout ? 0 : 1;
     }
   }
 

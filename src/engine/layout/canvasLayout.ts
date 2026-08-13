@@ -48,22 +48,26 @@ export function getPrintableArea(canvas: CanvasState) {
 }
 
 /** Generates SVG path string for 4 corner registration targets */
-export function generateRegistrationMarksSVG(canvas: CanvasState): string {
+export function generateRegistrationMarksSVG(canvas: CanvasState, viewW?: number, viewH?: number): string {
   const { widthPx, heightPx, marginPx } = getPrintableArea(canvas);
-  const size = 12; // 12px crosshair size
-  const offset = marginPx / 2;
+  const w = viewW || widthPx;
+  const h = viewH || heightPx;
+  const scale = w / Math.max(1, widthPx);
+
+  const size = 12 * scale; // 12px crosshair size
+  const offset = Math.max(4, (marginPx / 2) * scale);
 
   const corners: Point[] = [
-    { x: offset, y: offset },                           // Top-Left
-    { x: widthPx - offset, y: offset },                 // Top-Right
-    { x: offset, y: heightPx - offset },                // Bottom-Left
-    { x: widthPx - offset, y: heightPx - offset },       // Bottom-Right
+    { x: offset, y: offset },                     // Top-Left
+    { x: w - offset, y: offset },                 // Top-Right
+    { x: offset, y: h - offset },                // Bottom-Left
+    { x: w - offset, y: h - offset },             // Bottom-Right
   ];
 
   let pathData = '';
   corners.forEach(p => {
-    // Crosshair + outer circle
-    pathData += `M ${p.x - size / 2} ${p.y} H ${p.x + size / 2} M ${p.y - size / 2} ${p.x} V ${p.y + size / 2} `;
+    // Crosshair lines
+    pathData += `M ${p.x - size / 2} ${p.y} H ${p.x + size / 2} M ${p.x} ${p.y - size / 2} V ${p.y + size / 2} `;
   });
 
   return pathData;

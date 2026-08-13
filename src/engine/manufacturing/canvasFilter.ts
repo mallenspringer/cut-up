@@ -12,11 +12,16 @@ export function filterBinaryMaskCanvas(
 ): BinaryMask {
   const { width, height, data } = mask;
 
-  if (minFeaturePhysicalSize <= 0 || pixelPerMm <= 0 || smoothing <= 0) return mask;
+  if (pixelPerMm <= 0 || smoothing <= 0) return mask;
 
-  const maxBlurPx = (minFeaturePhysicalSize * pixelPerMm) / 4;
-  const blurPx = (smoothing / 100) * maxBlurPx;
-  if (blurPx < 0.5) return mask;
+  // Max smoothing blur radius in physical mm (3.0mm max throw)
+  // Non-linear scaling (t^1.15) gives fine sub-millimeter noise removal at 5-25%
+  // and ramps up to heavy smoothing & noise wipeout at 75-100%
+  const maxBlurMm = 3.0;
+  const factor = Math.min(100, Math.max(0, smoothing)) / 100;
+  const blurMm = Math.pow(factor, 1.15) * maxBlurMm;
+  const blurPx = blurMm * pixelPerMm;
+  if (blurPx < 0.4) return mask;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;

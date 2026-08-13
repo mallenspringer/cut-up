@@ -25,6 +25,12 @@ export function calculateAlphaMax(smoothingPercent: number): number {
   return (Math.min(100, Math.max(0, smoothingPercent)) / 100) * 1.33;
 }
 
+/** Calculates Potrace curve optimization tolerance (0.2 to 1.2) from smoothing percentage (0 to 100) */
+export function calculateOptTolerance(smoothingPercent: number): number {
+  const factor = Math.min(100, Math.max(0, smoothingPercent)) / 100;
+  return 0.2 + factor * 1.0;
+}
+
 /**
  * Traces a binary material mask into a clean, smooth, optimized SVG compound path using Potrace.
  * Traces negative space holes (0) so SVG even-odd fill-rule subtracts inner cutout contours

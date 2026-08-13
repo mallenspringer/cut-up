@@ -81,6 +81,30 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
     return canvas.toDataURL();
   }, [sourceImage, workingImage.crop]);
 
+  // Base fitted dimensions matching transform.ts raster engine
+  const { baseW, baseH } = React.useMemo(() => {
+    if (!sourceImage) return { baseW: printableWidthPx, baseH: printableHeightPx };
+    const geom = workingImage.crop?.geometry;
+    const cropW = (geom && geom.width > 0) ? geom.width : sourceImage.width;
+    const cropH = (geom && geom.height > 0) ? geom.height : sourceImage.height;
+
+    const cropAspect = cropW / Math.max(1, cropH);
+    const targetAspect = printableWidthPx / Math.max(1, printableHeightPx);
+
+    let bw = printableWidthPx;
+    let bh = printableHeightPx;
+
+    if (cropAspect > targetAspect) {
+      bw = printableWidthPx;
+      bh = printableWidthPx / cropAspect;
+    } else {
+      bh = printableHeightPx;
+      bw = printableHeightPx * cropAspect;
+    }
+
+    return { baseW: bw, baseH: bh };
+  }, [sourceImage, workingImage.crop, printableWidthPx, printableHeightPx]);
+
   // Ctrl + Wheel Zoom Listener
   useEffect(() => {
     const el = containerRef.current;
@@ -324,6 +348,152 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
           }}
         >
+          {/* 1. Source Preview */}
+          {activeTab === 'source' && (
+            <div
+              ref={imageBoxRef}
+              className="absolute inset-0 w-full h-full flex items-center justify-center z-10"
+            >
+              {sourceImage ? (
+                <div
+                  className={`relative flex items-center justify-center transition-all duration-75 ${
+                    isSelected ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                  }`}
+                  style={{
+                    width: `${baseW}px`,
+                    height: `${baseH}px`,
+                    transform: `translate(${workingImage.position.x}px, ${workingImage.position.y}px) scale(${workingImage.scaleX}, ${workingImage.scaleY})`,
+                  }}
+                >
+                  <img
+                    src={croppedSourceDataUrl || sourceImage.dataUrl}
+                    alt="Source Image"
+                    className="w-full h-full object-fill pointer-events-none block"
+                  />
+
+                  {/* Interactive Scale Grabber Handles (Click to Reveal) */}
+                  {isSelected && !isCropToolActive && (
+                    <>
+                      <div
+                        onMouseDown={(e) => handleHandleMouseDown(e, 'nw')}
+                        className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nwse-resize z-30 shadow"
+                      />
+                      <div
+                        onMouseDown={(e) => handleHandleMouseDown(e, 'ne')}
+                        className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nesw-resize z-30 shadow"
+                      />
+                      <div
+                        onMouseDown={(e) => handleHandleMouseDown(e, 'se')}
+                        className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nwse-resize z-30 shadow"
+                      />
+                      <div
+                        onMouseDown={(e) => handleHandleMouseDown(e, 'sw')}
+                        className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nesw-resize z-30 shadow"
+                      />
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <div className="text-slate-400 text-sm font-medium">No Image Uploaded</div>
+                  <div className="text-xs text-slate-500 max-w-xs">
+                    Upload a JPG, PNG, or WebP photo to convert into cut layers.
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    {onLoadSamplePattern && (
+                      <button
+                        onClick={onLoadSamplePattern}
+                        className="btn btn-sm btn-secondary text-xs"
+                      >
+                        Load Demo Pattern
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 2. Binary Mask Preview (Full Canvas) */}
+          {activeTab === 'binary' && (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-black z-10">
+              <canvas ref={binaryCanvasRef} className="w-full h-full object-fill" />
+            </div>
+          )}
+
+          {/* 3. Cut Geometry Preview (Full Canvas - Internal Blade Cuts Only) */}
+          {activeTab === 'cut' && (
+            <svg
+              className="absolute inset-0 w-full h-full bg-slate-950 z-10"
+              viewBox={`0 0 ${viewW} ${viewH}`}
+            >
+              {Array.from(layerPathDataMap.entries()).map(([layerId, pathData]) => {
+                const layer = layers.find(l => l.id === layerId);
+                const color = layer ? layer.color : '#38bdf8';
+                return pathData ? (
+                  <path
+                    key={layerId}
+                    d={pathData}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="1.5"
+                    fillRule="evenodd"
+                  />
+                ) : null;
+              })}
+            </svg>
+          )}
+
+          {/* 4. Layer Preview (Full Sheet in Layer Color with Inner Holes Subtracted) */}
+          {activeTab === 'layer' && selectedLayer && (
+            <svg
+              className="absolute inset-0 w-full h-full bg-slate-950 z-10"
+              viewBox={`0 0 ${viewW} ${viewH}`}
+            >
+              <rect width="100%" height="100%" fill="#0f172a" />
+              <path
+                d={`M 0 0 H ${viewW} V ${viewH} H 0 Z ${layerPathDataMap.get(selectedLayer.id) || ''}`}
+                fill={selectedLayer.color}
+                fillRule="evenodd"
+                stroke="none"
+              />
+            </svg>
+          )}
+
+          {/* 5. Composite Stack Simulation (Physical Paper Stack) */}
+          {activeTab === 'composite' && (
+            <div className="absolute inset-0 w-full h-full relative bg-slate-950 overflow-hidden flex items-center justify-center z-10">
+              {sortedLayers.map((layer, idx) => {
+                const pathData = layerPathDataMap.get(layer.id) || '';
+
+                // Solid backing base paper sheet only if layer 1 explicitly has isSolidBacking === true
+                const isSolid = idx === 0 && layer.isSolidBacking === true;
+                const sheetPath = isSolid
+                  ? `M 0 0 H ${viewW} V ${viewH} H 0 Z`
+                  : `M 0 0 H ${viewW} V ${viewH} H 0 Z ${pathData}`;
+
+                return (
+                  <svg
+                    key={layer.id}
+                    className="absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-150"
+                    style={{
+                      filter: idx > 0 ? 'drop-shadow(0px 2px 3px rgba(0,0,0,0.25))' : undefined,
+                    }}
+                    viewBox={`0 0 ${viewW} ${viewH}`}
+                  >
+                    <path
+                      d={sheetPath}
+                      fill={layer.color}
+                      fillRule="evenodd"
+                      stroke="rgba(0,0,0,0.15)"
+                      strokeWidth="0.5"
+                    />
+                  </svg>
+                );
+              })}
+            </div>
+          )}
+
           {/* Overlaid Margin Guide (z-index: 40 on top of image and cut paths) */}
           <div
             className="absolute border border-dashed border-indigo-400/70 pointer-events-none z-40"
@@ -334,168 +504,6 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
               bottom: `${marginPx}px`,
             }}
           />
-
-          {/* Printable Content Area Bounded by Paper Margins */}
-          <div
-            className="absolute flex items-center justify-center z-10"
-            style={{
-              top: `${marginPx}px`,
-              left: `${marginPx}px`,
-              width: `${printableWidthPx}px`,
-              height: `${printableHeightPx}px`,
-            }}
-          >
-            {/* 1. Source Preview */}
-            {activeTab === 'source' && (
-              <div
-                ref={imageBoxRef}
-                className="relative w-full h-full flex items-center justify-center"
-              >
-                {sourceImage ? (
-                  <div
-                    className={`relative flex items-center justify-center transition-all duration-75 ${
-                      isSelected ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
-                    }`}
-                    style={{
-                      transform: `translate(${workingImage.position.x}px, ${workingImage.position.y}px) scale(${workingImage.scaleX}, ${workingImage.scaleY})`,
-                      maxHeight: `${printableHeightPx}px`,
-                      maxWidth: `${printableWidthPx}px`,
-                    }}
-                  >
-                    <img
-                      src={croppedSourceDataUrl || sourceImage.dataUrl}
-                      alt="Source Image"
-                      className="object-contain pointer-events-none block"
-                      style={{
-                        maxHeight: `${printableHeightPx}px`,
-                        maxWidth: `${printableWidthPx}px`,
-                      }}
-                    />
-
-                    {/* Interactive Scale Grabber Handles (Click to Reveal) */}
-                    {isSelected && !isCropToolActive && (
-                      <>
-                        <div
-                          onMouseDown={(e) => handleHandleMouseDown(e, 'nw')}
-                          className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nwse-resize z-30 shadow"
-                        />
-                        <div
-                          onMouseDown={(e) => handleHandleMouseDown(e, 'ne')}
-                          className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nesw-resize z-30 shadow"
-                        />
-                        <div
-                          onMouseDown={(e) => handleHandleMouseDown(e, 'se')}
-                          className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nwse-resize z-30 shadow"
-                        />
-                        <div
-                          onMouseDown={(e) => handleHandleMouseDown(e, 'sw')}
-                          className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nesw-resize z-30 shadow"
-                        />
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center gap-3 p-6 text-center">
-                    <div className="text-slate-400 text-sm font-medium">No Image Uploaded</div>
-                    <div className="text-xs text-slate-500 max-w-xs">
-                      Upload a JPG, PNG, or WebP photo to convert into cut layers.
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      {onLoadSamplePattern && (
-                        <button
-                          onClick={onLoadSamplePattern}
-                          className="btn btn-sm btn-secondary text-xs"
-                        >
-                          Load Demo Pattern
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 2. Binary Mask Preview */}
-            {activeTab === 'binary' && (
-              <div className="w-full h-full flex items-center justify-center bg-black">
-                <canvas ref={binaryCanvasRef} className="w-full h-full object-contain" />
-              </div>
-            )}
-
-            {/* 3. Cut Geometry Preview */}
-            {activeTab === 'cut' && (
-              <svg
-                className="w-full h-full object-contain bg-slate-950"
-                viewBox={`0 0 ${viewW} ${viewH}`}
-              >
-                {Array.from(layerPathDataMap.entries()).map(([layerId, pathData]) => {
-                  const layer = layers.find(l => l.id === layerId);
-                  const color = layer ? layer.color : '#38bdf8';
-                  return pathData ? (
-                    <path
-                      key={layerId}
-                      d={pathData}
-                      fill="none"
-                      stroke={color}
-                      strokeWidth="1.5"
-                      fillRule="evenodd"
-                    />
-                  ) : null;
-                })}
-              </svg>
-            )}
-
-            {/* 4. Layer Preview */}
-            {activeTab === 'layer' && selectedLayer && (
-              <svg
-                className="w-full h-full object-contain bg-slate-950"
-                viewBox={`0 0 ${viewW} ${viewH}`}
-              >
-                <rect width="100%" height="100%" fill="#0f172a" />
-                <path
-                  d={`M 0 0 H ${viewW} V ${viewH} H 0 Z ${layerPathDataMap.get(selectedLayer.id) || ''}`}
-                  fill={selectedLayer.color}
-                  fillRule="evenodd"
-                  stroke="#ffffff"
-                  strokeWidth="0.5"
-                />
-              </svg>
-            )}
-
-            {/* 5. Composite Stack Simulation (Physical Paper Stack) */}
-            {activeTab === 'composite' && (
-              <div className="w-full h-full relative bg-slate-950 overflow-hidden flex items-center justify-center">
-                {sortedLayers.map((layer, idx) => {
-                  const pathData = layerPathDataMap.get(layer.id) || '';
-
-                  // Solid backing base paper sheet only if layer 1 explicitly has isSolidBacking === true
-                  const isSolid = idx === 0 && layer.isSolidBacking === true;
-                  const sheetPath = isSolid
-                    ? `M 0 0 H ${viewW} V ${viewH} H 0 Z`
-                    : `M 0 0 H ${viewW} V ${viewH} H 0 Z ${pathData}`;
-
-                  return (
-                    <svg
-                      key={layer.id}
-                      className="absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-150 object-contain"
-                      style={{
-                        filter: idx > 0 ? 'drop-shadow(0px 2px 3px rgba(0,0,0,0.25))' : undefined,
-                      }}
-                      viewBox={`0 0 ${viewW} ${viewH}`}
-                    >
-                      <path
-                        d={sheetPath}
-                        fill={layer.color}
-                        fillRule="evenodd"
-                        stroke="rgba(0,0,0,0.15)"
-                        strokeWidth="0.5"
-                      />
-                    </svg>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 

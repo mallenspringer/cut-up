@@ -17,7 +17,9 @@ export function resampleWorkingImage(
   targetWidth: number,
   targetHeight: number,
   pageWidthPx?: number,
-  pageHeightPx?: number
+  pageHeightPx?: number,
+  printableWidthPx?: number,
+  printableHeightPx?: number
 ): ResampledBuffer {
   const result = new Uint8ClampedArray(targetWidth * targetHeight * 4);
 
@@ -42,14 +44,32 @@ export function resampleWorkingImage(
   const scaleToTargetX = targetWidth / Math.max(1, pW);
   const scaleToTargetY = targetHeight / Math.max(1, pH);
 
+  // Scaled printable boundary inside the full canvas processing buffer
+  const printW = (printableWidthPx !== undefined ? printableWidthPx : pW) * scaleToTargetX;
+  const printH = (printableHeightPx !== undefined ? printableHeightPx : pH) * scaleToTargetY;
+
   const targetPosX = (workingState.position.x || 0) * scaleToTargetX;
   const targetPosY = (workingState.position.y || 0) * scaleToTargetY;
   const scaleX = workingState.scaleX || 1.0;
   const scaleY = workingState.scaleY || 1.0;
 
+  // Fit crop aspect ratio into printable area boundary (matching CSS object-contain)
+  const cropAspect = cropW / Math.max(1, cropH);
+  const targetAspect = printW / Math.max(1, printH);
+  let baseW = printW;
+  let baseH = printH;
+
+  if (cropAspect > targetAspect) {
+    baseW = printW;
+    baseH = printW / cropAspect;
+  } else {
+    baseH = printH;
+    baseW = printH * cropAspect;
+  }
+
   // Scaled dimensions in target canvas pixel space
-  const scaledWidth = targetWidth * scaleX;
-  const scaledHeight = targetHeight * scaleY;
+  const scaledWidth = baseW * scaleX;
+  const scaledHeight = baseH * scaleY;
 
   // Center-aligned transform origin matching CSS (50% 50%)
   const centerX = targetWidth / 2 + targetPosX;

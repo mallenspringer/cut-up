@@ -172,25 +172,33 @@ Future methods may include other resampling strategies, but they are outside MVP
 
 # 5. Luminance Processing
 
-Convert the working image to luminance/grayscale.
+Convert the working image to luminance/grayscale using a deterministic, perceptually weighted calculation.
 
-Use a deterministic luminance calculation.
+### 5.1 Luminance Formula
+The standard ITU-R BT.601 / Rec. 601 perceptual luminance formula must be used across all modules:
 
-The threshold control is based on a numeric luminance scale of:
+$$Y = 0.299 \times R + 0.587 \times G + 0.114 \times B$$
+
+Where $R, G, B \in [0, 255]$ and the computed luminance $Y$ is rounded to an integer in $[0, 255]$.
+
+### 5.2 Alpha & Transparency Handling
+- Pixels with transparent or semi-transparent alpha channels ($\text{alpha} < 255$) are composited against a pure white background ($255, 255, 255$) prior to luminance evaluation:
+  $$\text{effective } C = \text{round}\left(C \times \frac{A}{255} + 255 \times \left(1 - \frac{A}{255}\right)\right)$$
+- Fully transparent areas ($A = 0$) resolve to pure white ($Y = 255$).
+
+### 5.3 Numeric Threshold Contract
+The threshold control operates on an explicit numeric scale of:
 
 ```text
 0–255
 ```
 
-The UI should display the actual numeric threshold.
-
-Threshold controls should support:
-
-- slider
-- keyboard adjustment
-- direct numeric entry
-
-The underlying processing engine must operate on the numeric threshold rather than an opaque "gain" value.
+- **Underlying Engine:** Pure numeric thresholds strictly between $0$ and $255$. Never use opaque "gain", percentages, or normalized floats in the core state.
+- **UI Adjustments:** Threshold controls must support:
+  1. Smooth slider interaction
+  2. Direct numeric keyboard entry (clamped to $[0, 255]$)
+  3. Keyboard adjustment (arrow keys for fine $\pm 1$ increments, shift+arrow for $\pm 10$)
+- **Determinism:** Given the same working image buffer and numeric threshold $T$, the resulting `BinaryMask` is 100% bitwise deterministic.
 
 ---
 
@@ -1545,3 +1553,23 @@ The coding agent should not invent product behavior where this document establis
 Where implementation details remain unspecified, choose the simplest robust client-side implementation that satisfies the behavioral requirements and tests.
 
 The application should remain small enough to understand, modify, and extend by an LLM coding agent.
+
+---
+
+# 52. Architectural Clarifications & Decisions
+
+### 52.1 Canvas Placement & Margin Behavior
+- **Visual Coordinate Alignment:** The output vector cut geometry strictly matches the exact visual coordinate space of the user canvas.
+- **Transformations & Crops:** The source image can be freely moved, scaled (uniform or independent X/Y), and cropped.
+- **Margin Drafting Freedom:** Margins serve as visual drafting guidelines and default boundary margins. The system does *not* hard-clip or reject cuts that extend across or into the margins if the user deliberately places them there.
+
+### 52.2 Vector Tracing & Negative-Space Cutouts
+- **Potrace Negative Space Extraction:** Rather than tracing material borders and creating outer rectangle borders, the engine traces cutout holes ($0$ values) as foreground paths.
+- **Compound Path Fill-Rule:** All exported and previewed SVGs use `fill-rule="evenodd"`. Inner holes subtract naturally without generating coincident outer borders or hairline artifacts.
+
+### 52.3 Printing & Physical Sharing (v1.0 / v1.1)
+- **Primary Export:** Clean, dimensioned SVG files for laser cutting, vinyl plotting, and CNC routing.
+- **In-App Print Previews:** For physical drafting, reviews, and paper cut prototyping, in-app printing is supported for both:
+  1. Individual Layer Cut Geometry previews
+  2. Multi-layer Composite Stack visual simulations
+- **Implementation:** Pure client-side via CSS `@media print` / browser print contexts, introducing zero backend dependencies or pipeline complexity.

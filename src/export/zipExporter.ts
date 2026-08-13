@@ -20,14 +20,15 @@ export function exportLayerPackageZIP(
   layerPathDataMap: Map<string, string>,
   layers: LayerState[],
   canvas: CanvasState,
-  registrationMarks: boolean = false
+  registrationMarks: boolean = false,
+  processingResolution?: { width: number; height: number }
 ): void {
   const sortedLayers = [...layers].sort((a, b) => a.order - b.order);
   const zipFiles: Record<string, Uint8Array> = {};
 
   sortedLayers.forEach((layer, idx) => {
     const pathData = layerPathDataMap.get(layer.id) || '';
-    const svgStr = generateLayerSVG(pathData, layer, idx, canvas, registrationMarks);
+    const svgStr = generateLayerSVG(pathData, layer, idx, canvas, registrationMarks, processingResolution);
 
     const padIdx = String(idx + 1).padStart(2, '0');
     const padThresh = String(layer.threshold).padStart(3, '0');

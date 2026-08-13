@@ -6,7 +6,7 @@ import { resampleWorkingImage } from './engine/working/transform';
 import { computeLuminance, extractAlpha } from './engine/luminance/luminance';
 import { filterBinaryMaskCanvas } from './engine/manufacturing/canvasFilter';
 import { generateLayerMask } from './engine/layers/layerGenerator';
-import { traceBinaryMaskToSVG, calculateTurdSize, calculateAlphaMax } from './engine/vector/potraceEngine';
+import { traceBinaryMaskToSVG, calculateTurdSize, calculateAlphaMax, calculateOptTolerance } from './engine/vector/potraceEngine';
 import { convertToPixels, getPrintableArea } from './engine/layout/canvasLayout';
 import { extractImageDataFromImage, createSourceImageFromData } from './engine/source/sourceImage';
 
@@ -230,22 +230,24 @@ export const App: React.FC = () => {
       };
     }
 
-    const maxDim = 400;
-    const sourceAspect = deferredState.sourceImage.width / (deferredState.sourceImage.height || 1);
+    const { widthPx, heightPx, printableWidthPx, printableHeightPx } = getPrintableArea(deferredState.canvas);
+    const maxDim = 800;
+    const canvasAspect = widthPx / Math.max(1, heightPx);
     let targetW = maxDim;
-    let targetH = Math.round(maxDim / sourceAspect);
+    let targetH = Math.round(maxDim / canvasAspect);
     if (targetH > maxDim) {
       targetH = maxDim;
-      targetW = Math.round(maxDim * sourceAspect);
+      targetW = Math.round(maxDim * canvasAspect);
     }
 
-    // 1. Nearest-neighbor resample scaled into target processing buffer
-    const { printableWidthPx, printableHeightPx } = getPrintableArea(deferredState.canvas);
+    // 1. Nearest-neighbor resample scaled into full canvas processing buffer
     const resampled = resampleWorkingImage(
       deferredState.sourceImage,
       deferredState.workingImage,
       targetW,
       targetH,
+      widthPx,
+      heightPx,
       printableWidthPx,
       printableHeightPx
     );
@@ -265,6 +267,7 @@ export const App: React.FC = () => {
     // 4. Potrace vector parameters
     const turdSize = calculateTurdSize(deferredState.processing.minimumFeatureSize, pxPerMm);
     const alphaMax = calculateAlphaMax(deferredState.processing.smoothing);
+    const optTolerance = calculateOptTolerance(deferredState.processing.smoothing);
 
     const pathMap = new Map<string, string>();
     let firstLayerImageData: ImageData | null = null;
@@ -307,6 +310,7 @@ export const App: React.FC = () => {
         turdSize,
         alphaMax,
         optCurve: true,
+        optTolerance,
       });
 
       pathMap.set(layer.id, vectorResult.pathData);
@@ -456,6 +460,7 @@ export const App: React.FC = () => {
           <ExportPanel
             state={state}
             layerPathDataMap={layerPathDataMap}
+            processingResolution={processingResolution}
           />
         </aside>
       </div>
