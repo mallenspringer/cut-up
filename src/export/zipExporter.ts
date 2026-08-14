@@ -27,12 +27,20 @@ export function exportLayerPackageZIP(
   const zipFiles: Record<string, Uint8Array> = {};
 
   sortedLayers.forEach((layer, idx) => {
+    const isLayer0 = idx === 0;
+    const isVoid = isLayer0 && layer.isSolidBacking === false;
+
+    // Void Layer 0 has no physical material to cut
+    if (isVoid) return;
+
     const pathData = layerPathDataMap.get(layer.id) || '';
     const svgStr = generateLayerSVG(pathData, layer, idx, canvas, registrationMarks, processingResolution);
 
-    const padIdx = String(idx + 1).padStart(2, '0');
+    const padIdx = String(idx).padStart(2, '0');
     const padThresh = String(layer.threshold).padStart(3, '0');
-    const filename = `layer-${padIdx}-threshold-${padThresh}.svg`;
+    const filename = isLayer0
+      ? `layer-00-backing-solid.svg`
+      : `layer-${padIdx}-threshold-${padThresh}.svg`;
 
     zipFiles[filename] = strToU8(svgStr);
   });
