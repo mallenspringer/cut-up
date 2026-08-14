@@ -1,7 +1,7 @@
 import React from 'react';
 import { AppState, Unit } from '../../engine/types';
 import { CANVAS_PRESETS } from '../../engine/layout/canvasLayout';
-import { Layout, Maximize2, Target } from 'lucide-react';
+import { Layout, Smartphone, Monitor } from 'lucide-react';
 
 interface CanvasSettingsPanelProps {
   state: AppState;
@@ -12,53 +12,107 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
   state,
   onUpdateState,
 }) => {
-  const { canvas, output } = state;
+  const { canvas } = state;
+
+  const currentPresetIdx = CANVAS_PRESETS.findIndex(p => {
+    const minD = Math.min(p.width, p.height);
+    const maxD = Math.max(p.width, p.height);
+    const cMinD = Math.min(canvas.width, canvas.height);
+    const cMaxD = Math.max(canvas.width, canvas.height);
+    return Math.abs(minD - cMinD) < 0.01 && Math.abs(maxD - cMaxD) < 0.01 && p.unit === canvas.unit;
+  });
+
+  const handleOrientationChange = (newOrientation: 'portrait' | 'landscape') => {
+    if (newOrientation === canvas.orientation) return;
+    const isLandscape = newOrientation === 'landscape';
+    const newW = isLandscape ? Math.max(canvas.width, canvas.height) : Math.min(canvas.width, canvas.height);
+    const newH = isLandscape ? Math.min(canvas.width, canvas.height) : Math.max(canvas.width, canvas.height);
+    onUpdateState(prev => ({
+      ...prev,
+      canvas: {
+        ...prev.canvas,
+        width: newW,
+        height: newH,
+        orientation: newOrientation,
+      },
+    }));
+  };
 
   return (
-    <div className="p-4 space-y-4 border-b border-slate-800">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-        <Layout className="w-4 h-4 text-indigo-400" /> Physical Page
+    <div className="p-4 space-y-4 border-b border-sand-800/70">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-sand-300 flex items-center gap-2">
+        <Layout className="w-4 h-4 text-emerald-400" /> Physical Page
       </h3>
 
-      {/* Preset Selector */}
-      <div className="space-y-1">
-        <label className="block text-xs text-slate-300 font-medium">Page Size Preset</label>
-        <select
-          className="w-full"
-          value={
-            CANVAS_PRESETS.findIndex(
-              p => p.width === canvas.width && p.height === canvas.height && p.unit === canvas.unit
-            )
-          }
-          onChange={(e) => {
-            const idx = parseInt(e.target.value);
-            if (idx >= 0 && idx < CANVAS_PRESETS.length) {
-              const preset = CANVAS_PRESETS[idx];
-              onUpdateState(prev => ({
-                ...prev,
-                canvas: {
-                  ...prev.canvas,
-                  width: preset.width,
-                  height: preset.height,
-                  unit: preset.unit,
-                },
-              }));
-            }
-          }}
-        >
-          {CANVAS_PRESETS.map((p, idx) => (
-            <option key={idx} value={idx}>
-              {p.name}
-            </option>
-          ))}
-          <option value="-1">Custom Dimensions</option>
-        </select>
+      {/* Preset Selector & Orientation Toggle */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs text-sand-200 font-medium">Page Size Preset</label>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            className="flex-1 text-xs"
+            value={currentPresetIdx}
+            onChange={(e) => {
+              const idx = parseInt(e.target.value);
+              if (idx >= 0 && idx < CANVAS_PRESETS.length) {
+                const preset = CANVAS_PRESETS[idx];
+                const isLandscape = canvas.orientation === 'landscape';
+                const w = isLandscape ? Math.max(preset.width, preset.height) : Math.min(preset.width, preset.height);
+                const h = isLandscape ? Math.min(preset.width, preset.height) : Math.max(preset.width, preset.height);
+                onUpdateState(prev => ({
+                  ...prev,
+                  canvas: {
+                    ...prev.canvas,
+                    width: w,
+                    height: h,
+                    unit: preset.unit,
+                  },
+                }));
+              }
+            }}
+          >
+            {CANVAS_PRESETS.map((p, idx) => (
+              <option key={idx} value={idx}>
+                {p.name}
+              </option>
+            ))}
+            <option value="-1">Custom Dimensions</option>
+          </select>
+
+          {/* Orientation Toggle Buttons */}
+          <div className="flex items-center bg-moss-900 border border-sand-800/80 rounded p-0.5 shrink-0">
+            <button
+              onClick={() => handleOrientationChange('portrait')}
+              className={`p-1.5 rounded transition ${
+                canvas.orientation === 'portrait'
+                  ? 'bg-emerald-700 text-white shadow border border-emerald-600/40'
+                  : 'text-sand-400 hover:text-sand-200'
+              }`}
+              title="Portrait Orientation"
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => handleOrientationChange('landscape')}
+              className={`p-1.5 rounded transition ${
+                canvas.orientation === 'landscape'
+                  ? 'bg-emerald-700 text-white shadow border border-emerald-600/40'
+                  : 'text-sand-400 hover:text-sand-200'
+              }`}
+              title="Landscape Orientation"
+            >
+              <Monitor className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Dimension & Unit Input */}
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div>
-          <label className="block text-slate-400 mb-1">Width</label>
+          <label className="block text-sand-400 mb-1">Width</label>
           <input
             type="number"
             step="0.1"
@@ -66,14 +120,15 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
             value={canvas.width}
             onChange={(e) => {
               const width = parseFloat(e.target.value) || 1;
-              onUpdateState(prev => ({ ...prev, canvas: { ...prev.canvas, width } }));
+              const orientation = width > canvas.height ? 'landscape' : 'portrait';
+              onUpdateState(prev => ({ ...prev, canvas: { ...prev.canvas, width, orientation } }));
             }}
             className="w-full"
           />
         </div>
 
         <div>
-          <label className="block text-slate-400 mb-1">Height</label>
+          <label className="block text-sand-400 mb-1">Height</label>
           <input
             type="number"
             step="0.1"
@@ -81,14 +136,15 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
             value={canvas.height}
             onChange={(e) => {
               const height = parseFloat(e.target.value) || 1;
-              onUpdateState(prev => ({ ...prev, canvas: { ...prev.canvas, height } }));
+              const orientation = canvas.width > height ? 'landscape' : 'portrait';
+              onUpdateState(prev => ({ ...prev, canvas: { ...prev.canvas, height, orientation } }));
             }}
             className="w-full"
           />
         </div>
 
         <div>
-          <label className="block text-slate-400 mb-1">Unit</label>
+          <label className="block text-sand-400 mb-1">Unit</label>
           <select
             value={canvas.unit}
             onChange={(e) => {
@@ -107,8 +163,8 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
       {/* Margins */}
       <div className="space-y-1">
         <div className="flex items-center justify-between text-xs">
-          <label className="text-slate-300 font-medium">Page Margin</label>
-          <span className="font-mono text-indigo-300">{canvas.margin} {canvas.unit}</span>
+          <label className="text-sand-200 font-medium">Page Margin</label>
+          <span className="font-mono text-emerald-400">{canvas.margin} {canvas.unit}</span>
         </div>
         <input
           type="number"
@@ -120,23 +176,6 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
             onUpdateState(prev => ({ ...prev, canvas: { ...prev.canvas, margin } }));
           }}
           className="w-full"
-        />
-      </div>
-
-      {/* Registration Marks */}
-      <div className="flex items-center justify-between p-2.5 bg-slate-900/60 rounded border border-slate-800">
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
-          <Target className="w-4 h-4 text-slate-400" />
-          Registration Marks
-        </div>
-        <input
-          type="checkbox"
-          checked={output.registrationMarks}
-          onChange={(e) => {
-            const registrationMarks = e.target.checked;
-            onUpdateState(prev => ({ ...prev, output: { ...prev.output, registrationMarks } }));
-          }}
-          className="w-4 h-4 accent-indigo-500 cursor-pointer"
         />
       </div>
     </div>

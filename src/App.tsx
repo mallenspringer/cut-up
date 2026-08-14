@@ -13,8 +13,9 @@ import { extractImageDataFromImage, createSourceImageFromData } from './engine/s
 import { CanvasViewport } from './ui/components/CanvasViewport';
 import { ImageTransformPanel } from './ui/components/ImageTransformPanel';
 import { ProcessingPanel } from './ui/components/ProcessingPanel';
-import { LayerManagerPanel } from './ui/components/LayerManagerPanel';
 import { CanvasSettingsPanel } from './ui/components/CanvasSettingsPanel';
+import { LayerManagerPanel } from './ui/components/LayerManagerPanel';
+import { StackingModePanel } from './ui/components/StackingModePanel';
 import { ExportPanel } from './ui/components/ExportPanel';
 
 import { Scissors, Upload, Undo2, Redo2 } from 'lucide-react';
@@ -64,7 +65,7 @@ const DEFAULT_APP_STATE: AppState = {
     minimumFeatureSize: 2.0, // 2mm
     smoothing: 0,
   },
-  layers: createDefaultLayers(1),
+  layers: createDefaultLayers(2),
   output: {
     registrationMarks: false,
     exportMode: 'combined',
@@ -270,7 +271,8 @@ export const App: React.FC = () => {
     const optTolerance = calculateOptTolerance(deferredState.processing.smoothing);
 
     const pathMap = new Map<string, string>();
-    let firstLayerImageData: ImageData | null = null;
+    let selectedLayerImageData: ImageData | null = null;
+    const activeLayerId = deferredState.selectedLayerId || (deferredState.layers[1] ? deferredState.layers[1].id : deferredState.layers[0]?.id);
 
     deferredState.layers.forEach((layer: LayerState, idx: number) => {
       // Binary mask thresholding
@@ -293,7 +295,7 @@ export const App: React.FC = () => {
         deferredState.processing.smoothing
       );
 
-      if (idx === 0) {
+      if (layer.id === activeLayerId) {
         const imgData = new ImageData(targetW, targetH);
         for (let i = 0; i < cleanMask.data.length; i++) {
           const val = cleanMask.data[i] === 1 ? 255 : 0;
@@ -302,7 +304,7 @@ export const App: React.FC = () => {
           imgData.data[i * 4 + 2] = val;
           imgData.data[i * 4 + 3] = 255;
         }
-        firstLayerImageData = imgData;
+        selectedLayerImageData = imgData;
       }
 
       // Potrace Vector Tracing Engine
@@ -318,32 +320,33 @@ export const App: React.FC = () => {
 
     return {
       layerPathDataMap: pathMap,
-      binaryMaskData: firstLayerImageData,
+      binaryMaskData: selectedLayerImageData,
       processingResolution: { width: targetW, height: targetH },
     };
   }, [deferredState, activeTab]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-moss-950 text-slate-100">
       {/* App Header */}
-      <header className="h-14 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between shrink-0">
+      <header className="h-14 bg-[#ede7db] drafting-paper-grid border-b border-sand-300 px-6 flex items-center justify-between shrink-0 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <div className="w-8 h-8 rounded-lg bg-emerald-700 flex items-center justify-center shadow-md shadow-stone-900/25 border border-emerald-800/40">
             <Scissors className="w-5 h-5 text-white" />
           </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-white">Luminance Cut Pattern Converter</h1>
-            <p className="text-[11px] text-slate-400">Potrace Vector Engine & Paper Stacking</p>
+          <div className="flex items-center">
+            <h1 className="font-bungee text-[32px] tracking-wide uppercase text-[#25282b] select-none leading-none">
+              Cut Up
+            </h1>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+          <div className="flex items-center gap-1 bg-white/90 p-1 rounded-lg border border-[#555a60]/50 shadow-sm">
             <button
               onClick={handleUndo}
               disabled={history.past.length === 0}
-              className="p-1.5 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:pointer-events-none transition"
+              className="p-1.5 hover:bg-stone-200/70 text-[#2e3236] hover:text-black rounded disabled:opacity-30 disabled:pointer-events-none transition"
               title="Undo composition edit (Ctrl+Z)"
             >
               <Undo2 className="w-4 h-4" />
@@ -351,14 +354,14 @@ export const App: React.FC = () => {
             <button
               onClick={handleRedo}
               disabled={history.future.length === 0}
-              className="p-1.5 hover:bg-slate-700 text-slate-300 rounded disabled:opacity-30 disabled:pointer-events-none transition"
+              className="p-1.5 hover:bg-stone-200/70 text-[#2e3236] hover:text-black rounded disabled:opacity-30 disabled:pointer-events-none transition"
               title="Redo composition edit (Ctrl+Shift+Z)"
             >
               <Redo2 className="w-4 h-4" />
             </button>
           </div>
 
-          <label className="btn btn-primary cursor-pointer flex items-center gap-2">
+          <label className="btn btn-primary cursor-pointer flex items-center gap-2 shadow-md shadow-stone-900/30 hover:shadow-lg hover:shadow-stone-900/40 transition">
             <Upload className="w-4 h-4" /> Upload Image
             <input
               type="file"
@@ -422,8 +425,8 @@ export const App: React.FC = () => {
           onFileUpload={handleFileUpload}
         />
 
-        {/* Right Collapsible Control Sidebar */}
-        <aside className="w-96 bg-slate-900 border-l border-slate-800 flex flex-col h-full overflow-y-auto shrink-0">
+        {/* Right Control Sidebar */}
+        <aside className="w-96 bg-moss-900 border-l border-sand-800/70 flex flex-col h-full overflow-y-auto shrink-0 shadow-lg">
           {(activeTab === 'source' || activeTab === 'binary') && (
             <ImageTransformPanel
               state={state}
@@ -447,12 +450,17 @@ export const App: React.FC = () => {
             onUpdateState={(updater) => updateState(updater, false)}
           />
 
+          <CanvasSettingsPanel
+            state={state}
+            onUpdateState={(updater) => updateState(updater, false)}
+          />
+
           <LayerManagerPanel
             state={state}
             onUpdateState={(updater) => updateState(updater, false)}
           />
 
-          <CanvasSettingsPanel
+          <StackingModePanel
             state={state}
             onUpdateState={(updater) => updateState(updater, false)}
           />
@@ -461,6 +469,7 @@ export const App: React.FC = () => {
             state={state}
             layerPathDataMap={layerPathDataMap}
             processingResolution={processingResolution}
+            onUpdateState={(updater) => updateState(updater, false)}
           />
         </aside>
       </div>

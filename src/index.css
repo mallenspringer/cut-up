@@ -1,22 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Bungee+Shade&family=Comfortaa:wght@700&family=Dosis:wght@700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+.font-bungee {
+  font-family: 'Bungee Shade', cursive;
+}
+
+.font-gorton {
+  font-family: 'Comfortaa', 'Dosis', sans-serif;
+}
+
 :root {
-  --bg-primary: #090d16;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --bg-card: rgba(30, 41, 59, 0.7);
-  --border-color: rgba(255, 255, 255, 0.1);
-  --border-hover: rgba(255, 255, 255, 0.2);
+  --bg-primary: #1b281f;
+  --bg-secondary: #243629;
+  --bg-tertiary: #2c4233;
+  --bg-card: rgba(44, 66, 51, 0.85);
   
-  --accent-primary: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-glow: rgba(99, 102, 241, 0.3);
+  --border-color: rgba(214, 194, 137, 0.22);
+  --border-hover: rgba(214, 194, 137, 0.45);
+  
+  --accent-primary: #38a169;
+  --accent-hover: #2f855a;
+  --accent-glow: rgba(56, 161, 105, 0.35);
   
   --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-secondary: #c7d2c9;
+  --text-muted: #8ea394;
   
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -48,11 +58,18 @@ body {
   border-radius: var(--radius-md);
 }
 
+/* Drafting Paper Notebook Background with Dot Grid (Warmer & Slightly Darker) */
+.drafting-paper-grid {
+  background-color: #ede7db;
+  background-image: radial-gradient(circle, #b8b09f 1.3px, transparent 1.3px);
+  background-size: 24px 24px;
+}
+
 /* Form Controls */
 input[type="text"],
 input[type="number"],
 select {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(18, 26, 20, 0.7);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   padding: 6px 10px;
@@ -77,6 +94,7 @@ input[type="range"] {
   width: 100%;
   height: 6px;
   background: var(--bg-tertiary);
+  border: 1px solid rgba(214, 194, 137, 0.15);
   border-radius: 3px;
   outline: none;
 }
@@ -89,11 +107,13 @@ input[type="range"]::-webkit-slider-thumb {
   background: var(--accent-primary);
   cursor: pointer;
   box-shadow: 0 0 10px var(--accent-glow);
-  transition: transform 0.15s ease;
+  border: 1.5px solid #faf7ed;
+  transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.18);
+  background: var(--accent-hover);
 }
 
 /* Buttons */
@@ -123,13 +143,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   color: var(--text-primary);
   border-color: var(--border-color);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--bg-tertiary);
   border-color: var(--border-hover);
 }
 
@@ -140,7 +160,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Tab Navigation */
 .nav-tab {
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 16px;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--text-muted);
@@ -148,6 +172,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   background: none;
   border: none;
   cursor: pointer;
+  line-height: 1;
   transition: all 0.2s;
 }
 
@@ -161,20 +186,28 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 /* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #7a9c84 transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
-  border-radius: 3px;
+  background: #7a9c84;
+  border-radius: 4px;
+  border: 1px solid rgba(214, 194, 137, 0.25);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background: #22c55e;
+  border-color: rgba(255, 255, 255, 0.4);
 }

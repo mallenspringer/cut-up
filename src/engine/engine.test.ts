@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { BinaryMask } from './types';
 import { computeLuminance, thresholdToBinaryMask } from './luminance/luminance';
 import { traceBinaryMaskToSVG, calculateTurdSize, calculateAlphaMax, calculateOptTolerance } from './vector/potraceEngine';
-import { generateAutoThresholds, createDefaultLayers, generateLayerMask } from './layers/layerGenerator';
+import { generateAutoThresholds, createDefaultLayers, generateLayerMask, updateLayerThreshold } from './layers/layerGenerator';
 import { resampleWorkingImage } from './working/transform';
 import { generateCombinedSVG } from '../export/svgGenerator';
 import { zipSync, strToU8 } from 'fflate';
@@ -104,45 +104,51 @@ describe('Luminance Engine Core Tests', () => {
     expect(resultUnsmoothed.data).toEqual(mask.data); // Unsmoothed mask returns exact original mask reference
   });
 
-  it('7. Cumulative vs Exclusive Layer Mask Generation', () => {
+  it('7. Cumulative vs Exclusive Layer Mask Generation & Layer 0 Solid/Void', () => {
     // 3 pixels with luminance 30, 80, 150
     const lum = new Uint8Array([30, 80, 150]);
     const layers = [
-      { id: 'l1', threshold: 50, color: '#111', order: 0 },
-      { id: 'l2', threshold: 100, color: '#222', order: 1 },
-      { id: 'l3', threshold: 200, color: '#333', order: 2 },
+      { id: 'layer-0', threshold: 20, isSolidBacking: true, color: '#111', order: 0 },
+      { id: 'layer-1', threshold: 50, isSolidBacking: false, color: '#c75d50', order: 1 },
+      { id: 'layer-2', threshold: 100, isSolidBacking: false, color: '#cc7d43', order: 2 },
+      { id: 'layer-3', threshold: 200, isSolidBacking: false, color: '#cfaa4a', order: 3 },
     ];
 
-    // Cumulative mode: holes (0) expand monotonically as threshold increases
-    // Pixel 0 (lum 30): <= 50 (cut in l1, l2, l3)
-    // Pixel 1 (lum 80): > 50, <= 100 (cut in l2, l3)
-    // Pixel 2 (lum 150): > 100, <= 200 (cut in l3)
-    const cumL1 = generateLayerMask(lum, 3, 1, 0, layers, 'cumulative', false);
-    const cumL2 = generateLayerMask(lum, 3, 1, 1, layers, 'cumulative', false);
-    const cumL3 = generateLayerMask(lum, 3, 1, 2, layers, 'cumulative', false);
+    // Layer 0 Solid -> 100% solid paper (all 1s)
+    const solidL0 = generateLayerMask(lum, 3, 1, 0, layers, 'cumulative', false);
+    expect(solidL0.data[0]).toBe(1);
+    expect(solidL0.data[1]).toBe(1);
+    expect(solidL0.data[2]).toBe(1);
 
+    // Layer 0 Void -> 100% void (all 0s)
+    const voidLayers = [{ ...layers[0], isSolidBacking: false }, ...layers.slice(1)];
+    const voidL0 = generateLayerMask(lum, 3, 1, 0, voidLayers, 'cumulative', false);
+    expect(voidL0.data[0]).toBe(0);
+    expect(voidL0.data[1]).toBe(0);
+    expect(voidL0.data[2]).toBe(0);
+
+    // Cut Layer 1 (threshold 50): lum 30 <= 50 -> cutout (0), lum 80 > 50 -> solid (1)
+    const cumL1 = generateLayerMask(lum, 3, 1, 1, layers, 'cumulative', false);
     expect(cumL1.data[0]).toBe(0); // Cutout
     expect(cumL1.data[1]).toBe(1); // Solid paper
     expect(cumL1.data[2]).toBe(1); // Solid paper
 
-    expect(cumL2.data[0]).toBe(0); // Cutout (retained)
-    expect(cumL2.data[1]).toBe(0); // Cutout (new)
-    expect(cumL2.data[2]).toBe(1); // Solid paper
+    // Cut Layer 2 (threshold 100): lum 30, 80 <= 100 -> cutout (0), lum 150 > 100 -> solid (1)
+    const cumL2 = generateLayerMask(lum, 3, 1, 2, layers, 'cumulative', false);
+    expect(cumL2.data[0]).toBe(0);
+    expect(cumL2.data[1]).toBe(0);
+    expect(cumL2.data[2]).toBe(1);
 
-    expect(cumL3.data[0]).toBe(0); // Cutout
-    expect(cumL3.data[1]).toBe(0); // Cutout
-    expect(cumL3.data[2]).toBe(0); // Cutout
+    // Exclusive mode: each cut layer cuts ONLY its discrete band
+    const excL1 = generateLayerMask(lum, 3, 1, 1, layers, 'exclusive', false);
+    const excL2 = generateLayerMask(lum, 3, 1, 2, layers, 'exclusive', false);
+    const excL3 = generateLayerMask(lum, 3, 1, 3, layers, 'exclusive', false);
 
-    // Exclusive mode: each layer cuts ONLY its discrete band
-    const excL1 = generateLayerMask(lum, 3, 1, 0, layers, 'exclusive', false);
-    const excL2 = generateLayerMask(lum, 3, 1, 1, layers, 'exclusive', false);
-    const excL3 = generateLayerMask(lum, 3, 1, 2, layers, 'exclusive', false);
-
-    expect(excL1.data[0]).toBe(0); // Band 0-50: cut
+    expect(excL1.data[0]).toBe(0); // Band 21-50: cut
     expect(excL1.data[1]).toBe(1);
     expect(excL1.data[2]).toBe(1);
 
-    expect(excL2.data[0]).toBe(1); // Band 51-100: not cut
+    expect(excL2.data[0]).toBe(1);
     expect(excL2.data[1]).toBe(0); // Band 51-100: cut
     expect(excL2.data[2]).toBe(1);
 
@@ -222,8 +228,11 @@ describe('Luminance Engine Core Tests', () => {
       }
     }
 
-    const layers = [{ id: 'layer-1', threshold: 100, color: '#123456', order: 0 }];
-    const mask = generateLayerMask(lum, width, height, 0, layers, 'cumulative', false, alpha);
+    const layers = [
+      { id: 'layer-0', threshold: 0, color: '#111', order: 0, isSolidBacking: true },
+      { id: 'layer-1', threshold: 100, color: '#123456', order: 1, isSolidBacking: false },
+    ];
+    const mask = generateLayerMask(lum, width, height, 1, layers, 'cumulative', false, alpha);
 
     // All margin pixels (where alpha=0) MUST be solid paper (1)
     expect(mask.data[0]).toBe(1); // (0,0) margin -> solid
@@ -259,5 +268,27 @@ describe('Luminance Engine Core Tests', () => {
     // Filled sheet path must subtract inner cutout holes under evenodd rule
     expect(svgStr).toContain('M 0 0 H 800 V 1035 H 0 Z');
     expect(svgStr).toContain('fill-rule="evenodd"');
+  });
+
+  it('11. Bidirectional Cascading Layer Threshold Updates', () => {
+    const layers = [
+      { id: 'layer-0', threshold: 40, isSolidBacking: true, color: '#111', order: 0 },
+      { id: 'layer-1', threshold: 100, isSolidBacking: false, color: '#c75d50', order: 1 },
+      { id: 'layer-2', threshold: 180, isSolidBacking: false, color: '#cc7d43', order: 2 },
+      { id: 'layer-3', threshold: 255, isSolidBacking: false, color: '#cfaa4a', order: 3 },
+    ];
+
+    // Drag Layer 1 DOWN to 30 -> pushes Layer 0 down to 29
+    const cascadedDown = updateLayerThreshold(layers, 'layer-1', 30);
+    expect(cascadedDown.find(l => l.id === 'layer-1')?.threshold).toBe(30);
+    expect(cascadedDown.find(l => l.id === 'layer-0')?.threshold).toBe(29);
+    expect(cascadedDown.find(l => l.id === 'layer-2')?.threshold).toBe(180);
+
+    // Drag Layer 1 UP to 200 -> pushes Layer 2 up to 201
+    const cascadedUp = updateLayerThreshold(layers, 'layer-1', 200);
+    expect(cascadedUp.find(l => l.id === 'layer-1')?.threshold).toBe(200);
+    expect(cascadedUp.find(l => l.id === 'layer-2')?.threshold).toBe(201);
+    expect(cascadedUp.find(l => l.id === 'layer-3')?.threshold).toBe(255);
+    expect(cascadedUp.find(l => l.id === 'layer-0')?.threshold).toBe(40);
   });
 });

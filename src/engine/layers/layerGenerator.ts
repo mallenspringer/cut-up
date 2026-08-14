@@ -1,30 +1,25 @@
 import { LayerState, LayerMode, BinaryMask } from '../types';
 import { thresholdToBinaryMask } from '../luminance/luminance';
 
-/** Distinct, harmonious paper layer colors cycling through rich desaturated RGB shades */
+/** Distinct, harmonious paper layer colors: desaturated ROYGBIV, mid-to-dark grey, pink, chartreuse */
 export const DEFAULT_LAYER_COLORS = [
-  // Layers 1-8: Muted/darker rich RGB shades
-  '#1e293b', // Midnight Navy
-  '#1e3a8a', // Muted Deep Blue
-  '#0f766e', // Muted Deep Teal
-  '#15803d', // Muted Forest Green
-  '#b45309', // Muted Warm Amber
-  '#be123c', // Muted Deep Rose
-  '#6b21a8', // Muted Deep Violet
-  '#475569', // Slate Gray
-  // Layers 9-16: Lighter pastel RGB run
-  '#818cf8', // Pastel Indigo
-  '#38bdf8', // Pastel Sky Blue
-  '#34d399', // Pastel Emerald Mint
-  '#fbbf24', // Pastel Warm Amber
-  '#fb7185', // Pastel Coral Rose
-  '#c084fc', // Pastel Purple Lilac
-  '#f472b6', // Pastel Pink
-  '#cbd5e1', // Light Paper Gray
+  '#c75d50', // 1. Desaturated Red (Terracotta)
+  '#cc7d43', // 2. Desaturated Orange (Amber Rust)
+  '#cfaa4a', // 3. Desaturated Yellow (Warm Mustard)
+  '#599b66', // 4. Desaturated Green (Sage / Moss)
+  '#4b85a8', // 5. Desaturated Blue (Slate Denim)
+  '#566291', // 6. Desaturated Indigo (Dusk Navy)
+  '#845688', // 7. Desaturated Violet (Heather Plum)
+  '#4a524e', // 8. Mid-to-Dark Grey (Graphite)
+  '#c27a8d', // 9. Desaturated Pink (Dusty Rose)
+  '#98a349', // 10. Desaturated Chartreuse (Warm Olive-Lime)
 ];
 
 export function generateAutoThresholds(count: number): number[] {
-  if (count <= 1) return [255];
+  if (count <= 1) return [40];
+  if (count === 2) return [40, 255];
+  
+  // Distribute thresholds evenly from layer 0 up to 255
   const step = Math.floor(255 / count);
   const thresholds: number[] = [];
   for (let i = 1; i <= count; i++) {
@@ -37,23 +32,38 @@ export function generateAutoThresholds(count: number): number[] {
   return thresholds;
 }
 
-/** Generates default layer state array for N layers */
-export function createDefaultLayers(count: number = 1): LayerState[] {
-  const thresholds = generateAutoThresholds(count);
-  return thresholds.map((t, index) => ({
-    id: `layer-${index + 1}`,
-    threshold: t,
-    minThreshold: index === 0 ? 0 : undefined,
-    isSolidBacking: false, // Solid OFF by default on app load
-    color: DEFAULT_LAYER_COLORS[index % DEFAULT_LAYER_COLORS.length],
-    order: index,
-  }));
+/** Generates default layer state array (Default: Layer 0 Solid Black + Layer 1 Red) */
+export function createDefaultLayers(count: number = 2): LayerState[] {
+  const actualCount = Math.max(2, count);
+  const thresholds = generateAutoThresholds(actualCount);
+
+  return thresholds.map((t, index) => {
+    if (index === 0) {
+      return {
+        id: 'layer-0',
+        threshold: t,
+        minThreshold: 0,
+        isSolidBacking: true, // Solid ON by default on app load
+        color: '#111111', // Black for Layer 0
+        order: 0,
+      };
+    }
+
+    const cutIndex = index - 1; // 0-based for cut layers (Layer 1 = Red #c75d50)
+    return {
+      id: `layer-${index}`,
+      threshold: t,
+      isSolidBacking: false,
+      color: DEFAULT_LAYER_COLORS[cutIndex % DEFAULT_LAYER_COLORS.length],
+      order: index,
+    };
+  });
 }
 
 /** Validates and enforces strict monotonic threshold ordering (T_0 < T_1 < ... < T_n) */
 export function enforceMonotonicThresholds(layers: LayerState[]): LayerState[] {
   const sorted = [...layers].sort((a, b) => a.order - b.order);
-  let prevVal = 0;
+  let prevVal = -1;
 
   return sorted.map((layer, idx) => {
     const isTop = idx === sorted.length - 1;
@@ -67,6 +77,64 @@ export function enforceMonotonicThresholds(layers: LayerState[]): LayerState[] {
       threshold: clampedThreshold,
     };
   });
+}
+
+/**
+ * Updates a specific layer's threshold with bidirectional cascade pushing:
+ * - Dragging down pushes lower layers down
+ * - Dragging up pushes higher layers up
+ * Strict monotonicity (0 <= T_0 < T_1 < ... < T_n <= 255) is always preserved.
+ */
+export function updateLayerThreshold(
+  layers: LayerState[],
+  targetId: string,
+  newThreshold: number
+): LayerState[] {
+  const sorted = [...layers].sort((a, b) => a.order - b.order);
+  const targetIdx = sorted.findIndex(l => l.id === targetId);
+  if (targetIdx === -1) return layers;
+
+  const count = sorted.length;
+  const isTop = targetIdx === count - 1;
+  const clampedVal = Math.max(0, Math.min(isTop ? 255 : 254, newThreshold));
+
+  const updated: LayerState[] = sorted.map((l, idx) => ({ ...l, order: idx }));
+  updated[targetIdx].threshold = clampedVal;
+
+  // 1. Cascade downwards: push lower layers down if needed
+  for (let i = targetIdx - 1; i >= 0; i--) {
+    if (updated[i].threshold >= updated[i + 1].threshold) {
+      updated[i].threshold = Math.max(0, updated[i + 1].threshold - 1);
+    }
+  }
+
+  // If downwards cascade hit the floor (0), compress upwards
+  let floor = 0;
+  for (let i = 0; i <= targetIdx; i++) {
+    if (updated[i].threshold < floor) {
+      updated[i].threshold = floor;
+    }
+    floor = updated[i].threshold + 1;
+  }
+
+  // 2. Cascade upwards: push higher layers up if needed
+  for (let i = targetIdx + 1; i < count; i++) {
+    if (updated[i].threshold <= updated[i - 1].threshold) {
+      const isCurrentTop = i === count - 1;
+      updated[i].threshold = Math.min(isCurrentTop ? 255 : 254, updated[i - 1].threshold + 1);
+    }
+  }
+
+  // If upwards cascade hit the ceiling (255), compress downwards
+  let ceiling = 255;
+  for (let i = count - 1; i >= 0; i--) {
+    if (updated[i].threshold > ceiling) {
+      updated[i].threshold = ceiling;
+    }
+    ceiling = Math.max(0, updated[i].threshold - 1);
+  }
+
+  return updated;
 }
 
 /**
@@ -90,15 +158,20 @@ export function generateLayerMask(
     return { width, height, data: new Uint8Array(width * height) };
   }
 
-  // Solid uncut base paper sheet (Layer 1 only when isSolidBacking === true)
-  if (layerIndex === 0 && currentLayer.isSolidBacking === true) {
-    const solidData = new Uint8Array(width * height);
-    solidData.fill(1); // 100% solid paper cardstock base
-    return { width, height, data: solidData };
+  // Layer 0 handling: Solid Backing vs Void (Empty space behind stack)
+  if (layerIndex === 0) {
+    if (currentLayer.isSolidBacking === true) {
+      const solidData = new Uint8Array(width * height);
+      solidData.fill(1); // 100% solid paper cardstock base
+      return { width, height, data: solidData };
+    } else {
+      const voidData = new Uint8Array(width * height);
+      voidData.fill(0); // 100% void / empty space
+      return { width, height, data: voidData };
+    }
   }
 
-  const minThresh = currentLayer.minThreshold !== undefined ? currentLayer.minThreshold : 0;
-  const prevThreshold = layerIndex === 0 ? minThresh : sortedLayers[layerIndex - 1].threshold;
+  const prevThreshold = sortedLayers[layerIndex - 1].threshold;
   const currThreshold = currentLayer.threshold;
   const total = width * height;
   const maskData = new Uint8Array(total);
@@ -122,7 +195,7 @@ export function generateLayerMask(
         }
       } else {
         // Exclusive / Band Mode: cutout only for luminance within this layer's discrete band
-        const bandMin = layerIndex === 0 ? minThresh : prevThreshold + 1;
+        const bandMin = prevThreshold + 1;
         const inBand = val >= bandMin && val <= currThreshold;
         isCutout = !negative ? inBand : !inBand;
       }

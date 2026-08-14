@@ -105,6 +105,38 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
     return { baseW: bw, baseH: bh };
   }, [sourceImage, workingImage.crop, printableWidthPx, printableHeightPx]);
 
+  // Dynamically calculate zoom to fit canvas comfortably with drafting paper margin visible
+  const calculateFitZoom = React.useCallback(() => {
+    const el = containerRef.current;
+    if (!el || widthPx <= 0 || heightPx <= 0) return 0.85;
+
+    const availableW = el.clientWidth;
+    const availableH = el.clientHeight;
+    if (availableW <= 0 || availableH <= 0) return 0.85;
+
+    // 64px padding ensures generous drafting dotted paper margin around all 4 edges
+    const pad = 64;
+    const targetW = Math.max(100, availableW - pad);
+    const targetH = Math.max(100, availableH - pad);
+
+    const fitScale = Math.min(targetW / widthPx, targetH / heightPx);
+    return Math.max(0.2, Math.min(2.0, Math.floor(fitScale * 100) / 100));
+  }, [widthPx, heightPx]);
+
+  // Initial load and canvas size change fit zoom
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Small timeout ensures container layout dimensions are populated
+    const timer = setTimeout(() => {
+      const optimal = calculateFitZoom();
+      setZoom(optimal);
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [calculateFitZoom]);
+
   // Ctrl + Wheel Zoom Listener
   useEffect(() => {
     const el = containerRef.current;
@@ -257,10 +289,10 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
   } : null;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950 relative">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-moss-950 relative">
       {/* Top Preview Tab & Tool Selector */}
-      <div className="h-12 border-b border-slate-800 bg-slate-900/80 backdrop-blur px-4 flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center space-x-1">
+      <div className="h-[43px] border-b border-sand-800/70 bg-moss-900 px-4 flex items-center justify-between z-10 shrink-0 shadow-sm">
+        <div className="flex items-center space-x-1 h-full">
           <button
             className={`nav-tab ${activeTab === 'source' ? 'active' : ''}`}
             onClick={() => setActiveTab('source')}
@@ -299,7 +331,7 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
             <button
               onClick={() => setIsCropToolActive(prev => !prev)}
               className={`btn btn-sm flex items-center gap-1.5 text-xs transition ${
-                isCropToolActive ? 'btn-primary ring-2 ring-indigo-400' : 'btn-secondary'
+                isCropToolActive ? 'btn-primary ring-2 ring-emerald-400' : 'btn-secondary'
               }`}
               title="Click and drag a box to crop photo"
             >
@@ -309,15 +341,15 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
           </div>
         )}
 
-        <div className="text-xs text-slate-400 font-mono">
+        <div className="text-xs text-sand-400 font-mono pl-6 shrink-0 whitespace-nowrap">
           Page: {canvas.width}×{canvas.height} {canvas.unit} ({Math.round(widthPx)}×{Math.round(heightPx)} px)
         </div>
       </div>
 
-      {/* Main Preview Container with Ctrl+Wheel Zoom */}
+      {/* Main Preview Container with Drafting Paper Notebook Dot Grid */}
       <div
         ref={containerRef}
-        className={`flex-1 flex items-center justify-center p-8 overflow-auto relative select-none ${
+        className={`flex-1 flex items-center justify-center p-8 overflow-auto relative select-none drafting-paper-grid ${
           isCropToolActive ? 'cursor-crosshair' : ''
         }`}
         onMouseDown={handleMouseDown}
@@ -327,7 +359,7 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
         {/* Rubberband Drag-to-Crop Overlay */}
         {isCropToolActive && rubberband && (
           <div
-            className="fixed border-2 border-dashed border-indigo-400 bg-indigo-500/25 pointer-events-none z-50 rounded shadow-2xl"
+            className="fixed border-2 border-dashed border-emerald-500 bg-emerald-500/25 pointer-events-none z-50 rounded shadow-2xl"
             style={{
               left: `${rubberband.left}px`,
               top: `${rubberband.top}px`,
@@ -339,13 +371,13 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
 
         {/* Physical Paper Page Frame with Scale Zoom */}
         <div
-          className="bg-white shadow-2xl relative transition-transform duration-75 border border-slate-700 overflow-hidden flex items-center justify-center shrink-0"
+          className="bg-white relative transition-transform duration-75 border border-sand-700/60 overflow-hidden flex items-center justify-center shrink-0"
           style={{
             width: `${widthPx}px`,
             height: `${heightPx}px`,
             transform: `scale(${zoom})`,
             transformOrigin: 'center center',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+            boxShadow: '0 20px 50px -10px rgba(45, 38, 25, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
           }}
         >
           {/* 1. Source Preview */}
@@ -357,7 +389,7 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
               {sourceImage ? (
                 <div
                   className={`relative flex items-center justify-center transition-all duration-75 ${
-                    isSelected ? 'ring-2 ring-indigo-500 ring-offset-1' : ''
+                    isSelected ? 'ring-2 ring-emerald-500 ring-offset-1' : ''
                   }`}
                   style={{
                     width: `${baseW}px`,
@@ -376,19 +408,19 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
                     <>
                       <div
                         onMouseDown={(e) => handleHandleMouseDown(e, 'nw')}
-                        className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nwse-resize z-30 shadow"
+                        className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-full cursor-nwse-resize z-30 shadow"
                       />
                       <div
                         onMouseDown={(e) => handleHandleMouseDown(e, 'ne')}
-                        className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nesw-resize z-30 shadow"
+                        className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-full cursor-nesw-resize z-30 shadow"
                       />
                       <div
                         onMouseDown={(e) => handleHandleMouseDown(e, 'se')}
-                        className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nwse-resize z-30 shadow"
+                        className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-full cursor-nwse-resize z-30 shadow"
                       />
                       <div
                         onMouseDown={(e) => handleHandleMouseDown(e, 'sw')}
-                        className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-indigo-600 rounded-full cursor-nesw-resize z-30 shadow"
+                        className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-white border-2 border-emerald-600 rounded-full cursor-nesw-resize z-30 shadow"
                       />
                     </>
                   )}
@@ -447,27 +479,45 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
           {/* 4. Layer Preview (Full Sheet in Layer Color with Inner Holes Subtracted) */}
           {activeTab === 'layer' && selectedLayer && (
             <svg
-              className="absolute inset-0 w-full h-full bg-slate-950 z-10"
+              className="absolute inset-0 w-full h-full bg-transparent z-10"
               viewBox={`0 0 ${viewW} ${viewH}`}
             >
-              <rect width="100%" height="100%" fill="#0f172a" />
-              <path
-                d={`M 0 0 H ${viewW} V ${viewH} H 0 Z ${layerPathDataMap.get(selectedLayer.id) || ''}`}
-                fill={selectedLayer.color}
-                fillRule="evenodd"
-                stroke="none"
-              />
+              {(() => {
+                const isLayer0 = selectedLayer.order === 0;
+                const isVoid = isLayer0 && selectedLayer.isSolidBacking === false;
+                if (isVoid) {
+                  return null; // Void Layer 0 is transparent empty space
+                }
+
+                const isSolid = isLayer0 && selectedLayer.isSolidBacking !== false;
+                const sheetPath = isSolid
+                  ? `M 0 0 H ${viewW} V ${viewH} H 0 Z`
+                  : `M 0 0 H ${viewW} V ${viewH} H 0 Z ${layerPathDataMap.get(selectedLayer.id) || ''}`;
+
+                return (
+                  <path
+                    d={sheetPath}
+                    fill={selectedLayer.color}
+                    fillRule="evenodd"
+                    stroke="none"
+                  />
+                );
+              })()}
             </svg>
           )}
 
           {/* 5. Composite Stack Simulation (Physical Paper Stack) */}
           {activeTab === 'composite' && (
-            <div className="absolute inset-0 w-full h-full relative bg-slate-950 overflow-hidden flex items-center justify-center z-10">
+            <div className="absolute inset-0 w-full h-full relative bg-transparent overflow-hidden flex items-center justify-center z-10">
               {sortedLayers.map((layer, idx) => {
-                const pathData = layerPathDataMap.get(layer.id) || '';
+                const isLayer0 = idx === 0;
+                const isVoid = isLayer0 && layer.isSolidBacking === false;
 
-                // Solid backing base paper sheet only if layer 1 explicitly has isSolidBacking === true
-                const isSolid = idx === 0 && layer.isSolidBacking === true;
+                // Void Layer 0 represents transparent empty space behind the stack
+                if (isVoid) return null;
+
+                const pathData = layerPathDataMap.get(layer.id) || '';
+                const isSolid = isLayer0 && layer.isSolidBacking !== false;
                 const sheetPath = isSolid
                   ? `M 0 0 H ${viewW} V ${viewH} H 0 Z`
                   : `M 0 0 H ${viewW} V ${viewH} H 0 Z ${pathData}`;
@@ -508,24 +558,24 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
       </div>
 
       {/* FIXED Bottom-Right Zoom Control Cluster (Pinned to outer viewport corner) */}
-      <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-slate-800 p-1 rounded-lg shadow-xl text-xs text-slate-300">
+      <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-[#142017]/90 backdrop-blur-md border border-sand-700/90 p-1.5 rounded-lg shadow-2xl text-xs text-white">
         <button
           onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}
-          className="p-1.5 hover:bg-slate-800 rounded text-slate-300 transition"
+          className="p-1.5 hover:bg-[#223627] rounded text-white hover:text-sand-100 transition"
           title="Zoom Out (Ctrl + Wheel Down)"
         >
           <ZoomOut className="w-4 h-4" />
         </button>
         <button
-          onClick={() => setZoom(1.0)}
-          className="px-2 py-1 font-mono text-[11px] hover:bg-slate-800 text-slate-300 transition rounded"
-          title="Reset Zoom to 100%"
+          onClick={() => setZoom(calculateFitZoom())}
+          className="px-2 py-1 font-mono text-[11px] font-semibold hover:bg-[#223627] text-white hover:text-sand-100 transition rounded"
+          title="Fit Canvas to Viewport"
         >
           {Math.round(zoom * 100)}%
         </button>
         <button
           onClick={() => setZoom(z => Math.min(4.0, z * 1.25))}
-          className="p-1.5 hover:bg-slate-800 rounded text-slate-300 transition"
+          className="p-1.5 hover:bg-[#223627] rounded text-white hover:text-sand-100 transition"
           title="Zoom In (Ctrl + Wheel Up)"
         >
           <ZoomIn className="w-4 h-4" />

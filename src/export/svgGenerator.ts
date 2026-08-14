@@ -20,13 +20,16 @@ export function generateLayerSVG(
     ? `\n  <path d="${generateRegistrationMarksSVG(canvas, viewW, viewH)}" stroke="#000" stroke-width="1" fill="none" />`
     : '';
 
-  // Solid backing base paper sheet only if layerIndex === 0 && isSolidBacking === true
-  const isSolid = layerIndex === 0 && layer.isSolidBacking === true;
-  const sheetPathData = isSolid
-    ? `M 0 0 H ${viewW} V ${viewH} H 0 Z`
-    : `M 0 0 H ${viewW} V ${viewH} H 0 Z ${layerPathData}`;
+  // Solid backing base paper sheet for Layer 0 if isSolidBacking !== false
+  const isLayer0 = layerIndex === 0;
+  const isVoid = isLayer0 && layer.isSolidBacking === false;
+  const isSolid = isLayer0 && layer.isSolidBacking !== false;
 
-  const pathSvg = `<path d="${sheetPathData}" fill="${layer.color}" fill-rule="evenodd" stroke="none" />`;
+  const pathSvg = isVoid
+    ? ''
+    : isSolid
+      ? `<path d="M 0 0 H ${viewW} V ${viewH} H 0 Z" fill="${layer.color}" fill-rule="evenodd" stroke="none" />`
+      : `<path d="M 0 0 H ${viewW} V ${viewH} H 0 Z ${layerPathData}" fill="${layer.color}" fill-rule="evenodd" stroke="none" />`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}${canvas.unit}" height="${canvas.height}${canvas.unit}" viewBox="0 0 ${viewW} ${viewH}">
@@ -54,8 +57,14 @@ export function generateCombinedSVG(
   const sortedLayers = [...layers].sort((a, b) => a.order - b.order);
 
   const layerGroupsSvg = sortedLayers.map((layer, idx) => {
+    const isLayer0 = idx === 0;
+    const isVoid = isLayer0 && layer.isSolidBacking === false;
+    if (isVoid) {
+      return `  <!-- Layer 0 (Void / Empty Space) -->\n  <g id="${layer.id}" data-threshold="${layer.threshold}"></g>`;
+    }
+
     const pathData = layerPathDataMap.get(layer.id) || '';
-    const isSolid = idx === 0 && layer.isSolidBacking === true;
+    const isSolid = isLayer0 && layer.isSolidBacking !== false;
     const sheetPathData = isSolid
       ? `M 0 0 H ${viewW} V ${viewH} H 0 Z`
       : `M 0 0 H ${viewW} V ${viewH} H 0 Z ${pathData}`;

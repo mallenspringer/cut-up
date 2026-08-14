@@ -1,13 +1,20 @@
 import { CanvasPreset, CanvasState, Unit, Point } from '../types';
 
 export const CANVAS_PRESETS: CanvasPreset[] = [
+  // 1. Letter
+  { name: '8.5 × 11 in (Letter)', width: 8.5, height: 11, unit: 'in' },
+  // 2. 12 × 12 in
+  { name: '12 × 12 in (Cardstock)', width: 12, height: 12, unit: 'in' },
+  // 3. A-Series (A3–A6)
+  { name: 'A3 (297 × 420 mm)', width: 297, height: 420, unit: 'mm' },
+  { name: 'A4 (210 × 297 mm)', width: 210, height: 297, unit: 'mm' },
+  { name: 'A5 (148 × 210 mm)', width: 148, height: 210, unit: 'mm' },
+  { name: 'A6 (105 × 148 mm)', width: 105, height: 148, unit: 'mm' },
+  // 4. Common Photo & Print Sizes
   { name: '4 × 6 in (Photo)', width: 4, height: 6, unit: 'in' },
   { name: '5 × 7 in (Greeting)', width: 5, height: 7, unit: 'in' },
+  { name: '8 × 10 in (Photo)', width: 8, height: 10, unit: 'in' },
   { name: '6 × 9 in (Trade)', width: 6, height: 9, unit: 'in' },
-  { name: '8.5 × 11 in (Letter)', width: 8.5, height: 11, unit: 'in' },
-  { name: '11 × 8.5 in (Letter Land)', width: 11, height: 8.5, unit: 'in' },
-  { name: '12 × 12 in (Cardstock)', width: 12, height: 12, unit: 'in' },
-  { name: 'A4 (210 × 297 mm)', width: 210, height: 297, unit: 'mm' },
 ];
 
 /** Converts physical unit value to Inches */
