@@ -27,25 +27,11 @@ jobs:
       - name: 5. Build Production Bundle
         run: npm run build
 
-      - name: 6. Sanitize FTP Connection Parameters
-        id: ftp-config
-        run: |
-          RAW_SERVER="${{ secrets.FTP_SERVER }}"
-          # Strip protocol prefixes (ftp://, ftps://, https://, http://) and trailing slashes/paths
-          CLEAN_SERVER=$(echo "$RAW_SERVER" | sed -e 's|^[^/]*://||' -e 's|/.*$||' | tr -d '[:space:]')
-
-          RAW_DIR="${{ secrets.FTP_REMOTE_DIR }}"
-          CLEAN_DIR="${RAW_DIR%/}/"
-          [[ "$CLEAN_DIR" != /* ]] && CLEAN_DIR="/$CLEAN_DIR"
-
-          echo "server=$CLEAN_SERVER" >> "$GITHUB_OUTPUT"
-          echo "dir=$CLEAN_DIR" >> "$GITHUB_OUTPUT"
-
-      - name: 7. Sync Dist to Hostinger via FTPS
+      - name: 6. Sync Dist to Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ steps.ftp-config.outputs.server }}
+          server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ steps.ftp-config.outputs.dir }}
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
           local-dir: ./dist/
