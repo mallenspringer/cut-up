@@ -15,7 +15,7 @@ jobs:
       - name: 2. Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: 3. Install Dependencies
@@ -27,11 +27,21 @@ jobs:
       - name: 5. Build Production Bundle
         run: npm run build
 
-      - name: 6. Sync Dist to Hostinger via FTPS
+      - name: 6. Normalize Remote Directory Path
+        id: format-dir
+        run: |
+          RAW_DIR="${{ secrets.FTP_REMOTE_DIR }}"
+          # Strip any trailing slashes and ensure exactly one trailing slash
+          CLEAN_DIR="${RAW_DIR%/}/"
+          # Ensure leading slash if not relative
+          [[ "$CLEAN_DIR" != /* ]] && CLEAN_DIR="/$CLEAN_DIR"
+          echo "dir=$CLEAN_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: 7. Sync Dist to Hostinger via FTPS
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          server-dir: ${{ steps.format-dir.outputs.dir }}
           local-dir: ./dist/
