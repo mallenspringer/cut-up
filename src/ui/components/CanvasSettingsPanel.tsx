@@ -41,7 +41,7 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
   return (
     <div className="p-4 space-y-4 border-b border-sand-800/70">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-sand-300 flex items-center gap-2">
-        <Layout className="w-4 h-4 text-emerald-400" /> Physical Page
+        <Layout className="w-4 h-4 text-emerald-400" /> Page
       </h3>
 
       {/* Preset Selector & Orientation Toggle */}

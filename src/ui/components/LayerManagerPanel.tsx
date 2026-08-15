@@ -75,7 +75,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
     <div className="p-4 space-y-4 border-b border-sand-800/70">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-sand-300 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-emerald-400" /> Layer Stack ({layers.length}/11)
+          <Layers className="w-4 h-4 text-emerald-400" /> Layers ({layers.length}/11)
         </h3>
 
         <div className="flex items-center gap-2">

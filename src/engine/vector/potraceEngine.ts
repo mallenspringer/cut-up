@@ -16,6 +16,7 @@ export interface VectorLayerResult {
 
 /** Calculates turdSize (minimum island area in square pixels) from feature diameter mm and pxPerMm scale */
 export function calculateTurdSize(minimumFeatureSizeMm: number, pxPerMm: number): number {
+  if (minimumFeatureSizeMm <= 0) return 0;
   const diameterPx = minimumFeatureSizeMm * pxPerMm;
   return Math.round(diameterPx * diameterPx);
 }
