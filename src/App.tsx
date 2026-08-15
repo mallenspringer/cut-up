@@ -471,6 +471,23 @@ export const App: React.FC = () => {
             processingResolution={processingResolution}
             onUpdateState={(updater) => updateState(updater, false)}
           />
+
+          {/* App Footer */}
+          <footer className="p-4 mt-auto border-t border-sand-800/70 text-center text-xs text-sand-400/90 leading-relaxed bg-moss-950/30">
+            <div>Copyright 2026 M. Springer</div>
+            <div>
+              a{' '}
+              <a
+                href="https://poemware.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-400 hover:text-emerald-300 font-medium underline underline-offset-2 transition"
+              >
+                Poemware
+              </a>{' '}
+              Application
+            </div>
+          </footer>
         </aside>
       </div>
     </div>
