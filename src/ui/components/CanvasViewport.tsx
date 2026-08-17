@@ -815,6 +815,13 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
                   ? `drop-shadow(0px ${Math.max(1, Math.round(shadowDepth * 0.4))}px ${shadowDepth}px ${hexToRgba(shadowColor, shadowOpacity)})`
                   : undefined;
 
+                const paperTexture = preferences?.paperTexture ?? 'off';
+                const textureStrength = paperTexture === 'smooth_bristol'
+                  ? (preferences?.textureStrengths?.smooth_bristol ?? 0.10)
+                  : paperTexture === 'cold_press'
+                    ? (preferences?.textureStrengths?.cold_press ?? 0.10)
+                    : 0;
+
                 return (
                   <svg
                     key={layer.id}
@@ -824,6 +831,29 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
                     }}
                     viewBox={`0 0 ${viewW} ${viewH}`}
                   >
+                    {/* Reusable Paper Texture SVG Filters */}
+                    {paperTexture !== 'off' && (
+                      <defs>
+                        {paperTexture === 'smooth_bristol' && (
+                          <filter id={`filter-bristol-${layer.id}`} x="0%" y="0%" width="100%" height="100%">
+                            <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="3" seed={idx * 37 + 101} result="noise" />
+                            <feColorMatrix type="matrix" values="0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0.33 0.33 0.33 0 0  0 0 0 1 0" in="noise" result="grayNoise" />
+                            <feComposite in="grayNoise" in2="SourceAlpha" operator="in" />
+                          </filter>
+                        )}
+                        {paperTexture === 'cold_press' && (
+                          <filter id={`filter-coldpress-${layer.id}`} x="0%" y="0%" width="100%" height="100%">
+                            <feTurbulence type="fractalNoise" baseFrequency="0.045 0.075" numOctaves="4" seed={idx * 37 + 101} result="noise" />
+                            <feDiffuseLighting in="noise" lightingColor="#ffffff" surfaceScale="2.2" diffuseConstant="1.2" result="light">
+                              <feDistantLight azimuth="45" elevation="55" />
+                            </feDiffuseLighting>
+                            <feComposite in="light" in2="SourceAlpha" operator="in" />
+                          </filter>
+                        )}
+                      </defs>
+                    )}
+
+                    {/* Solid Base Paper Sheet */}
                     <path
                       d={sheetPath}
                       fill={layer.color}
@@ -831,6 +861,20 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
                       stroke="rgba(0,0,0,0.15)"
                       strokeWidth="0.5"
                     />
+
+                    {/* Tactile Paper Grain Overlay */}
+                    {paperTexture !== 'off' && textureStrength > 0 && (
+                      <path
+                        d={sheetPath}
+                        fillRule="evenodd"
+                        fill={paperTexture === 'cold_press' ? '#ffffff' : '#808080'}
+                        filter={paperTexture === 'cold_press' ? `url(#filter-coldpress-${layer.id})` : `url(#filter-bristol-${layer.id})`}
+                        style={{
+                          mixBlendMode: paperTexture === 'cold_press' ? 'multiply' : 'overlay',
+                          opacity: textureStrength,
+                        }}
+                      />
+                    )}
                   </svg>
                 );
               })}

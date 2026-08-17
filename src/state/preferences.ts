@@ -13,9 +13,13 @@ export interface UserPreferences {
   defaultUnit: 'in' | 'mm' | 'cm'; // default: 'in'
   defaultBridgeWidthMm: number; // default: 2.0
 
-  // Backdrop & Planned Texture Features
+  // Backdrop & Tactile Paper Textures
   backdropTheme: 'drafting' | 'cutting_mat' | 'clean_gray';
   paperTexture: 'off' | 'smooth_bristol' | 'cold_press';
+  textureStrengths: {
+    smooth_bristol: number; // 0.05 to 1.0 (default: 0.35)
+    cold_press: number;     // 0.05 to 1.0 (default: 0.50)
+  };
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -32,6 +36,10 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
 
   backdropTheme: 'drafting',
   paperTexture: 'off',
+  textureStrengths: {
+    smooth_bristol: 0.10,
+    cold_press: 0.10,
+  },
 };
 
 const STORAGE_KEY = 'cutup_user_preferences_v1';
@@ -47,6 +55,10 @@ export function loadUserPreferences(): UserPreferences {
     return {
       ...DEFAULT_USER_PREFERENCES,
       ...parsed,
+      textureStrengths: {
+        ...DEFAULT_USER_PREFERENCES.textureStrengths,
+        ...(parsed.textureStrengths || {}),
+      },
     };
   } catch {
     return DEFAULT_USER_PREFERENCES;

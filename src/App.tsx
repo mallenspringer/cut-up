@@ -359,7 +359,7 @@ export const App: React.FC = () => {
               Cut Up
             </h1>
             <span className="text-xs font-sans font-semibold text-black tracking-wide select-none">
-              V 1.0
+              V 1.1
             </span>
           </div>
         </div>

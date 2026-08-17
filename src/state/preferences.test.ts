@@ -28,6 +28,9 @@ describe('User Preferences & Storage Manager', () => {
     expect(prefs.layerShadowOpacity).toBe(0.25);
     expect(prefs.enableCookiePersistence).toBe(false);
     expect(prefs.cookieConsentDismissed).toBe(false);
+    expect(prefs.paperTexture).toBe('off');
+    expect(prefs.textureStrengths.smooth_bristol).toBe(0.10);
+    expect(prefs.textureStrengths.cold_press).toBe(0.10);
   });
 
   it('2. Saves and loads preferences when persistence is enabled', () => {
@@ -38,6 +41,11 @@ describe('User Preferences & Storage Manager', () => {
       layerShadowDepth: 10,
       layerShadowOpacity: 0.5,
       defaultUnit: 'mm',
+      paperTexture: 'cold_press',
+      textureStrengths: {
+        smooth_bristol: 0.6,
+        cold_press: 0.85,
+      },
     };
 
     saveUserPreferences(customPrefs);
@@ -48,6 +56,9 @@ describe('User Preferences & Storage Manager', () => {
     expect(loaded.layerShadowDepth).toBe(10);
     expect(loaded.layerShadowOpacity).toBe(0.5);
     expect(loaded.defaultUnit).toBe('mm');
+    expect(loaded.paperTexture).toBe('cold_press');
+    expect(loaded.textureStrengths.smooth_bristol).toBe(0.6);
+    expect(loaded.textureStrengths.cold_press).toBe(0.85);
   });
 
   it('3. Clears storage if user disables persistence', () => {

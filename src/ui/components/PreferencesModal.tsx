@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { X, Sliders, Layers, Sparkles, Grid, Cookie, Lock, Check, RotateCcw } from 'lucide-react';
+import { X, Sliders, Layers, Sparkles, Grid, Cookie, Check, RotateCcw } from 'lucide-react';
 import { UserPreferences, DEFAULT_USER_PREFERENCES } from '../../state/preferences';
 
 interface PreferencesModalProps {
@@ -41,6 +41,24 @@ const WORKBENCH_THEMES = [
   },
 ];
 
+const PAPER_TEXTURES = [
+  {
+    id: 'off' as const,
+    name: 'Off (Smooth)',
+    desc: 'Crisp flat vector cardstock',
+  },
+  {
+    id: 'smooth_bristol' as const,
+    name: 'Hot-Press Bristol',
+    desc: 'Fine tooth & satin paper grain',
+  },
+  {
+    id: 'cold_press' as const,
+    name: 'Cold-Press Rag',
+    desc: 'Organic cotton dimpled relief',
+  },
+];
+
 export const PreferencesModal: React.FC<PreferencesModalProps> = ({
   isOpen,
   preferences,
@@ -69,6 +87,13 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
       cookieConsentDismissed: prev.cookieConsentDismissed,
     }));
   };
+
+  const currentTexture = preferences.paperTexture;
+  const currentTextureStrength = currentTexture === 'smooth_bristol'
+    ? (preferences.textureStrengths?.smooth_bristol ?? 0.10)
+    : currentTexture === 'cold_press'
+      ? (preferences.textureStrengths?.cold_press ?? 0.10)
+      : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
@@ -162,7 +187,81 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
             </div>
           </div>
 
-          {/* SECTION 2: 3D Composite Simulation & Direct-Print Depth */}
+          {/* SECTION 2: Tactile Paper Textures (Active) */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-sand-300">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span>Tactile Paper Textures</span>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-mono font-normal">
+                {PAPER_TEXTURES.find(p => p.id === preferences.paperTexture)?.name || 'Off (Smooth)'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-lg bg-moss-950/60 border border-sand-800/70 space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {PAPER_TEXTURES.map((tex) => {
+                  const isSelected = preferences.paperTexture === tex.id;
+                  return (
+                    <button
+                      key={tex.id}
+                      type="button"
+                      onClick={() => onUpdatePreferences(prev => ({ ...prev, paperTexture: tex.id }))}
+                      className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all duration-150 ${
+                        isSelected
+                          ? 'bg-moss-800 border-emerald-500 ring-2 ring-emerald-500/50 shadow-md shadow-emerald-950/40'
+                          : 'bg-moss-900/90 border-sand-800 hover:border-sand-700 hover:bg-moss-850'
+                      }`}
+                    >
+                      <div className="font-semibold text-xs text-sand-100 flex items-center justify-between">
+                        <span>{tex.name}</span>
+                        {isSelected && <Check className="w-3 h-3 text-emerald-400 shrink-0" />}
+                      </div>
+                      <div className="text-[10px] text-sand-400 leading-tight mt-1">
+                        {tex.desc}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Per-Texture Strength Slider */}
+              {currentTexture !== 'off' && (
+                <div className="space-y-1.5 pt-3 border-t border-sand-800/60 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between text-sand-200">
+                    <span className="font-medium">
+                      Texture Prominence ({currentTexture === 'smooth_bristol' ? 'Bristol' : 'Cold-Press'})
+                    </span>
+                    <span className="font-mono text-emerald-400">{Math.round(currentTextureStrength * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.05"
+                    max="1.0"
+                    step="0.05"
+                    value={currentTextureStrength}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      onUpdatePreferences(prev => ({
+                        ...prev,
+                        textureStrengths: {
+                          ...prev.textureStrengths,
+                          [currentTexture]: val,
+                        },
+                      }));
+                    }}
+                    className="w-full h-1.5 bg-moss-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                  />
+                  <p className="text-[10px] text-sand-500">
+                    Adjusts the tactile depth and relief opacity. Settings persist independently for each paper type.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION 3: 3D Composite Simulation & Direct-Print Depth */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sand-300">
               <Layers className="w-4 h-4 text-emerald-400" />
@@ -281,7 +380,7 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
             </div>
           </div>
 
-          {/* SECTION 3: Storage & Session Persistence */}
+          {/* SECTION 4: Storage & Session Persistence */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sand-300">
               <Cookie className="w-4 h-4 text-emerald-400" />
@@ -311,40 +410,6 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                   }}
                   className="w-4 h-4 accent-emerald-600 cursor-pointer"
                 />
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 4: MOCKED / LOCKED FEATURES (In Design & Planning) */}
-          <div className="space-y-4 opacity-75">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-sand-400">
-                <Sparkles className="w-4 h-4 text-sand-500" />
-                <span>Tactile Paper Textures</span>
-              </div>
-              <span className="text-[10px] font-medium bg-sand-800/80 text-sand-300 border border-sand-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Lock className="w-2.5 h-2.5" /> In Design
-              </span>
-            </div>
-
-            <div className="p-4 rounded-lg bg-moss-950/40 border border-sand-800/50 space-y-4 text-xs pointer-events-none select-none">
-              {/* Paper Textures Mockup */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sand-400">
-                  <span className="font-medium">Paper Tactile Grain</span>
-                  <span className="text-[10px] text-sand-500 italic">Off (Smooth)</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="p-2 rounded border border-sand-800 bg-moss-900/60 text-center text-[11px] text-sand-400 opacity-60">
-                    Smooth Bristol
-                  </div>
-                  <div className="p-2 rounded border border-sand-800 bg-moss-900/60 text-center text-[11px] text-sand-400 opacity-60">
-                    Textured Cold-Press
-                  </div>
-                  <div className="p-2 rounded border border-emerald-500/40 bg-moss-850 text-center text-[11px] text-sand-200">
-                    Off
-                  </div>
-                </div>
               </div>
             </div>
           </div>
