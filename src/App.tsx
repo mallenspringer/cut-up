@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, PreviewTab, WorkingImageState, LayerState } from './engine/types';
 import { createDefaultLayers } from './engine/layers/layerGenerator';
 import { createInitialHistory, pushHistorySnapshot, undoHistory, redoHistory, HistoryState } from './state/history';
+import { UserPreferences, loadUserPreferences, saveUserPreferences } from './state/preferences';
 import { resampleWorkingImage } from './engine/working/transform';
 import { computeLuminance, extractAlpha } from './engine/luminance/luminance';
 import { filterBinaryMaskCanvas } from './engine/manufacturing/canvasFilter';
@@ -17,8 +18,10 @@ import { ProcessingPanel } from './ui/components/ProcessingPanel';
 import { CanvasSettingsPanel } from './ui/components/CanvasSettingsPanel';
 import { LayerManagerPanel } from './ui/components/LayerManagerPanel';
 import { ExportPanel } from './ui/components/ExportPanel';
+import { PreferencesModal } from './ui/components/PreferencesModal';
+import { CookieConsentBanner } from './ui/components/CookieConsentBanner';
 
-import { Scissors, Upload, Undo2, Redo2 } from 'lucide-react';
+import { Scissors, Upload, Undo2, Redo2, Settings } from 'lucide-react';
 
 const DEFAULT_WORKING_IMAGE: WorkingImageState = {
   crop: {
@@ -77,6 +80,18 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryState>(() => createInitialHistory(DEFAULT_APP_STATE));
   const state = history.present;
   const [activeTab, setActiveTab] = useState<PreviewTab>('composite');
+
+  // User preferences & Cookie storage state
+  const [preferences, setPreferences] = useState<UserPreferences>(() => loadUserPreferences());
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+
+  const updatePreferences = (updater: (prev: UserPreferences) => UserPreferences) => {
+    setPreferences(prev => {
+      const next = updater(prev);
+      saveUserPreferences(next);
+      return next;
+    });
+  };
 
   const loadSamplePattern = () => {
     const sampleCanvas = document.createElement('canvas');
@@ -383,6 +398,14 @@ export const App: React.FC = () => {
               className="hidden"
             />
           </label>
+
+          <button
+            onClick={() => setIsPreferencesOpen(true)}
+            className="p-2 rounded-lg bg-[#142017]/90 text-sand-200 hover:text-white hover:bg-[#223627] border border-sand-700/90 shadow-md transition"
+            title="Workspace Preferences & Display Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
       </header>
 
@@ -396,6 +419,7 @@ export const App: React.FC = () => {
           layerPathDataMap={layerPathDataMap}
           binaryMask={binaryMaskData}
           processingResolution={processingResolution}
+          preferences={preferences}
           activeTool={state.activeTool || 'navigate'}
           setActiveTool={(tool) => updateState(prev => ({ ...prev, activeTool: tool }), false)}
           bridgeWidthMm={state.bridgeWidthMm || 2.0}
@@ -505,6 +529,34 @@ export const App: React.FC = () => {
           </footer>
         </aside>
       </div>
+
+      {/* Preferences & Display Settings Modal */}
+      <PreferencesModal
+        isOpen={isPreferencesOpen}
+        preferences={preferences}
+        onUpdatePreferences={updatePreferences}
+        onClose={() => setIsPreferencesOpen(false)}
+      />
+
+      {/* First-Visit Cookie & Persistence Consent Banner */}
+      {!preferences.cookieConsentDismissed && (
+        <CookieConsentBanner
+          onAccept={() => {
+            updatePreferences(prev => ({
+              ...prev,
+              enableCookiePersistence: true,
+              cookieConsentDismissed: true,
+            }));
+          }}
+          onDecline={() => {
+            updatePreferences(prev => ({
+              ...prev,
+              enableCookiePersistence: false,
+              cookieConsentDismissed: true,
+            }));
+          }}
+        />
+      )}
     </div>
   );
 };

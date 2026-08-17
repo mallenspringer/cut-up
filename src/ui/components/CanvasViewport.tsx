@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { AppState, PreviewTab, Rect, CanvasTool, LayerManualEdits, ManualBridgeStroke, ManualFillPoint } from '../../engine/types';
+import { UserPreferences } from '../../state/preferences';
 import { getPrintableArea } from '../../engine/layout/canvasLayout';
 import { ZoomIn, ZoomOut, Crop, Wand2, PenLine, RotateCcw, MousePointer } from 'lucide-react';
 
@@ -21,6 +22,7 @@ interface CanvasViewportProps {
   setActiveTool?: (tool: CanvasTool) => void;
   bridgeWidthMm?: number;
   setBridgeWidthMm?: (width: number) => void;
+  preferences?: UserPreferences;
   onUpdateState?: (updater: (prev: AppState) => AppState) => void;
 }
 
@@ -43,6 +45,7 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
   setActiveTool,
   bridgeWidthMm = 2.0,
   setBridgeWidthMm,
+  preferences,
   onUpdateState,
 }) => {
   const { canvas, workingImage, layers, sourceImage } = state;
@@ -470,6 +473,12 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
     (selectedLayer.manualEdits.bridges && selectedLayer.manualEdits.bridges.length > 0)
   );
 
+  const themeClass = preferences?.backdropTheme === 'cutting_mat'
+    ? 'workbench-theme-cutting_mat'
+    : preferences?.backdropTheme === 'clean_gray'
+      ? 'workbench-theme-clean_gray'
+      : 'workbench-theme-drafting';
+
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-moss-950 relative">
       {/* Top Preview Tab & Interactive Tool Selector */}
@@ -612,18 +621,18 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
         </div>
       </div>
 
-      {/* Main Preview Container with Drafting Paper Notebook Dot Grid */}
+      {/* Main Preview Container with Dynamic Workbench Backdrop */}
       <div
         ref={containerRef}
-        className={`flex-1 flex items-center justify-center p-8 overflow-auto relative select-none drafting-paper-grid ${
+        className={`flex-1 flex items-center justify-center p-8 overflow-auto relative select-none transition-colors duration-200 ${themeClass} ${
           isCropToolActive ? 'cursor-crosshair' : ''
         }`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
-        {/* Rubberband Drag-to-Crop Overlay */}
-        {isCropToolActive && rubberband && (
+            {/* Rubberband Drag-to-Crop Overlay */}
+            {isCropToolActive && rubberband && (
           <div
             className="fixed border-2 border-dashed border-emerald-500 bg-emerald-500/25 pointer-events-none z-50 rounded shadow-2xl"
             style={{
@@ -788,12 +797,30 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
                   ? `M 0 0 H ${viewW} V ${viewH} H 0 Z`
                   : `M 0 0 H ${viewW} V ${viewH} H 0 Z ${pathData}`;
 
+                const shadowDepth = preferences?.layerShadowDepth ?? 4;
+                const shadowOpacity = preferences?.layerShadowOpacity ?? 0.25;
+                const shadowColor = preferences?.layerShadowColor ?? '#000000';
+
+                const hexToRgba = (hex: string, alpha: number) => {
+                  let c = (hex || '#000000').replace('#', '');
+                  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+                  const num = parseInt(c, 16) || 0;
+                  const r = (num >> 16) & 255;
+                  const g = (num >> 8) & 255;
+                  const b = num & 255;
+                  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                };
+
+                const filterStyle = idx > 0 && shadowDepth > 0 && shadowOpacity > 0
+                  ? `drop-shadow(0px ${Math.max(1, Math.round(shadowDepth * 0.4))}px ${shadowDepth}px ${hexToRgba(shadowColor, shadowOpacity)})`
+                  : undefined;
+
                 return (
                   <svg
                     key={layer.id}
-                    className="absolute inset-0 w-full h-full pointer-events-none transition-opacity duration-150"
+                    className="absolute inset-0 w-full h-full pointer-events-none transition-all duration-150"
                     style={{
-                      filter: idx > 0 ? 'drop-shadow(0px 2px 3px rgba(0,0,0,0.25))' : undefined,
+                      filter: filterStyle,
                     }}
                     viewBox={`0 0 ${viewW} ${viewH}`}
                   >

@@ -58,7 +58,28 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Drafting Paper Notebook Background with Dot Grid (Warmer & Slightly Darker) */
+/* Workbench Backdrop Themes */
+.workbench-theme-drafting {
+  background-color: #ede7db;
+  background-image: radial-gradient(circle, #b8b09f 1.3px, transparent 1.3px);
+  background-size: 24px 24px;
+}
+
+.workbench-theme-cutting_mat {
+  background-color: #132a1c;
+  background-image:
+    linear-gradient(rgba(46, 125, 79, 0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(46, 125, 79, 0.25) 1px, transparent 1px),
+    linear-gradient(rgba(74, 222, 128, 0.45) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(74, 222, 128, 0.45) 1.5px, transparent 1.5px);
+  background-size: 12px 12px, 12px 12px, 48px 48px, 48px 48px;
+}
+
+.workbench-theme-clean_gray {
+  background-color: #27272a;
+  background-image: radial-gradient(ellipse at 50% 50%, #3f3f46 0%, #18181b 90%);
+}
+
 .drafting-paper-grid {
   background-color: #ede7db;
   background-image: radial-gradient(circle, #b8b09f 1.3px, transparent 1.3px);

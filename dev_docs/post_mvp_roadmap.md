@@ -37,12 +37,11 @@ Provide an "Options / Preferences" modal for customizing on-screen visual presen
 
 ### Key Capabilities & Settings
 - **Enhanced Visual Simulation & Print Pop:**
-  - **Layer Drop Shadows:** Adjustable simulated shadow depth ($0\text{px}$ to $12\text{px}$) and opacity ($0\%$ to $60\%$) between sheets in Composite View. Makes physical stack depth pop dramatically when printing or exporting image snapshots directly from the browser.
-  - **Ambient Paper Texture / Lighting:** Subtle tactile paper grain overlay in Composite simulation.
-- **Workflow & Canvas Guides:**
-  - **Guideline Visibility & Color:** Toggle and customize draft margin guides, center crosshairs, and rule alignments.
-  - **Unit Display Preferences:** Independent selection of default measurement units (Inches, Millimeters, Centimeters) for margins and rulers.
-  - **Canvas Backdrop Styles:** Switch workbench background between drafting paper grid, dark studio felt, cutting mat grid, or clean neutral gray.
+  - **Layer Drop Shadows:** Adjustable simulated shadow depth ($0\text{px}$ to $16\text{px}$), darkness ($0\%$ to $70\%$), and custom color tint between sheets in Composite View. Makes physical stack depth pop dramatically when printing or exporting image snapshots directly from the browser.
+  - **Ambient Paper Texture / Lighting:** Planned subtle tactile paper grain overlay in Composite simulation.
+- **Workflow & Workbench Styles:**
+  - **Canvas Backdrop Themes:** Switch workbench background between *Drafting Grid* (ivory dot matrix), *Cutting Mat* (workshop green grid), or *Neutral Gray* (18% photo gray).
+  - **Privacy & Session Storage:** Optional client-side preference persistence with first-visit consent banner and instant reset-to-defaults.
 - **Non-Interference Guarantee:** These settings apply exclusively to viewport rendering and direct browser printing; raw machine SVG exports remain strictly 1:1, unit-accurate, and unbloated.
 
 ---
