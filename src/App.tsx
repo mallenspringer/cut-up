@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo, useDeferredValue } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AppState, PreviewTab, WorkingImageState, LayerState } from './engine/types';
 import { createDefaultLayers } from './engine/layers/layerGenerator';
-import { createInitialHistory, pushHistorySnapshot, undoHistory, redoHistory } from './state/history';
+import { createInitialHistory, pushHistorySnapshot, undoHistory, redoHistory, HistoryState } from './state/history';
 import { resampleWorkingImage } from './engine/working/transform';
 import { computeLuminance, extractAlpha } from './engine/luminance/luminance';
 import { filterBinaryMaskCanvas } from './engine/manufacturing/canvasFilter';
 import { generateLayerMask } from './engine/layers/layerGenerator';
+import { applyManualEditsToMask } from './engine/layers/manualEdits';
 import { traceBinaryMaskToSVG, calculateTurdSize, calculateAlphaMax, calculateOptTolerance } from './engine/vector/potraceEngine';
 import { convertToPixels, getPrintableArea } from './engine/layout/canvasLayout';
 import { extractImageDataFromImage, createSourceImageFromData } from './engine/source/sourceImage';
@@ -63,15 +64,18 @@ const DEFAULT_APP_STATE: AppState = {
     smoothing: 0,
   },
   layers: createDefaultLayers(2),
+  selectedLayerId: 'layer-1',
   output: {
     registrationMarks: false,
     exportMode: 'combined',
   },
+  activeTool: 'navigate',
+  bridgeWidthMm: 2.0,
 };
 
 export const App: React.FC = () => {
-  const [state, setState] = useState<AppState>(DEFAULT_APP_STATE);
-  const [history, setHistory] = useState(() => createInitialHistory(DEFAULT_WORKING_IMAGE));
+  const [history, setHistory] = useState<HistoryState>(() => createInitialHistory(DEFAULT_APP_STATE));
+  const state = history.present;
   const [activeTab, setActiveTab] = useState<PreviewTab>('composite');
 
   const loadSamplePattern = () => {
@@ -116,12 +120,13 @@ export const App: React.FC = () => {
         crop: { type: 'rectangle', geometry: { x: 0, y: 0, width: 400, height: 400 } },
       };
 
-      setState(prev => ({
-        ...prev,
+      const nextState: AppState = {
+        ...state,
         sourceImage: sampleSource,
         workingImage: newWorkingImage,
-      }));
-      setHistory(createInitialHistory(newWorkingImage));
+        selectedLayerId: 'layer-1',
+      };
+      setHistory(createInitialHistory(nextState));
       setActiveTab('source');
     }
   };
@@ -159,13 +164,14 @@ export const App: React.FC = () => {
           },
         };
 
-        setState(prev => ({
-          ...prev,
+        const nextState: AppState = {
+          ...state,
           sourceImage: source,
           workingImage: newWorkingImage,
-        }));
+          selectedLayerId: 'layer-1',
+        };
 
-        setHistory(createInitialHistory(newWorkingImage));
+        setHistory(createInitialHistory(nextState));
         setActiveTab('source');
       };
       img.src = dataUrl;
@@ -173,38 +179,36 @@ export const App: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  // State update wrapper with composition history snapshotting
-  const updateState = (updater: (prev: AppState) => AppState, snapshotComposition: boolean = false) => {
-    setState(prev => {
-      const next = updater(prev);
-      if (snapshotComposition && next.workingImage !== prev.workingImage) {
-        setHistory(h => pushHistorySnapshot(h, next.workingImage));
+  // State update wrapper with pure, atomic history snapshotting
+  const updateState = (updater: (prev: AppState) => AppState, snapshotHistory: boolean = false) => {
+    setHistory(prevHistory => {
+      const nextState = updater(prevHistory.present);
+      if (snapshotHistory) {
+        return pushHistorySnapshot(prevHistory, nextState);
+      } else {
+        return {
+          ...prevHistory,
+          present: nextState,
+        };
       }
-      return next;
     });
   };
 
   // Undo / Redo Handlers
   const handleUndo = () => {
-    const { history: newHistory, snapshot } = undoHistory(history);
-    if (snapshot) {
-      setHistory(newHistory);
-      setState(prev => ({ ...prev, workingImage: snapshot.workingImage }));
-    }
+    setHistory(prev => undoHistory(prev));
   };
 
   const handleRedo = () => {
-    const { history: newHistory, snapshot } = redoHistory(history);
-    if (snapshot) {
-      setHistory(newHistory);
-      setState(prev => ({ ...prev, workingImage: snapshot.workingImage }));
-    }
+    setHistory(prev => redoHistory(prev));
   };
 
   // Keyboard shortcut listener for Ctrl+Z and Ctrl+Shift+Z
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        e.stopPropagation();
         if (e.shiftKey) {
           handleRedo();
         } else {
@@ -214,13 +218,11 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [history]);
-
-  const deferredState = useDeferredValue(state);
+  }, []);
 
   // Derived Processing Pipeline Computation via Potrace Vector Tracing Engine
   const { layerPathDataMap, binaryMaskData, processingResolution } = useMemo(() => {
-    if (!deferredState.sourceImage || activeTab === 'source') {
+    if (!state.sourceImage || activeTab === 'source') {
       return {
         layerPathDataMap: new Map<string, string>(),
         binaryMaskData: null,
@@ -228,7 +230,7 @@ export const App: React.FC = () => {
       };
     }
 
-    const { widthPx, heightPx, printableWidthPx, printableHeightPx } = getPrintableArea(deferredState.canvas);
+    const { widthPx, heightPx, printableWidthPx, printableHeightPx } = getPrintableArea(state.canvas);
     const maxDim = 800;
     const canvasAspect = widthPx / Math.max(1, heightPx);
     let targetW = maxDim;
@@ -240,8 +242,8 @@ export const App: React.FC = () => {
 
     // 1. Nearest-neighbor resample scaled into full canvas processing buffer
     const resampled = resampleWorkingImage(
-      deferredState.sourceImage,
-      deferredState.workingImage,
+      state.sourceImage,
+      state.workingImage,
       targetW,
       targetH,
       widthPx,
@@ -255,45 +257,54 @@ export const App: React.FC = () => {
     const alpha = extractAlpha(resampled);
 
     // 3. Pixel density (px/mm)
-    const canvasWidthMm = deferredState.canvas.unit === 'mm'
-      ? deferredState.canvas.width
-      : deferredState.canvas.unit === 'cm'
-        ? deferredState.canvas.width * 10
-        : deferredState.canvas.width * 25.4;
+    const canvasWidthMm = state.canvas.unit === 'mm'
+      ? state.canvas.width
+      : state.canvas.unit === 'cm'
+        ? state.canvas.width * 10
+        : state.canvas.width * 25.4;
     const pxPerMm = targetW / Math.max(1, canvasWidthMm);
 
     // 4. Potrace vector parameters
-    const turdSize = calculateTurdSize(deferredState.processing.minimumFeatureSize, pxPerMm);
-    const alphaMax = calculateAlphaMax(deferredState.processing.smoothing);
-    const optTolerance = calculateOptTolerance(deferredState.processing.smoothing);
+    const turdSize = calculateTurdSize(state.processing.minimumFeatureSize, pxPerMm);
+    const alphaMax = calculateAlphaMax(state.processing.smoothing);
+    const optTolerance = calculateOptTolerance(state.processing.smoothing);
 
     const pathMap = new Map<string, string>();
     let selectedLayerImageData: ImageData | null = null;
-    const activeLayerId = deferredState.selectedLayerId || (deferredState.layers[1] ? deferredState.layers[1].id : deferredState.layers[0]?.id);
+    const activeLayerId = state.selectedLayerId || (state.layers[1] ? state.layers[1].id : state.layers[0]?.id);
 
-    deferredState.layers.forEach((layer: LayerState, idx: number) => {
+    state.layers.forEach((layer: LayerState, idx: number) => {
       // Binary mask thresholding
       const rawMask = generateLayerMask(
         luminance,
         targetW,
         targetH,
         idx,
-        deferredState.layers,
+        state.layers,
         alpha
       );
 
       // Canvas 2D pre-filter for boundary smoothing & gap bridging
       const cleanMask = filterBinaryMaskCanvas(
         rawMask,
-        deferredState.processing.minimumFeatureSize,
+        state.processing.minimumFeatureSize,
         pxPerMm,
-        deferredState.processing.smoothing
+        state.processing.smoothing
+      );
+
+      // Apply manual touchups (Wand fills & Bridge capsules) ON TOP of cleaned mask
+      const finalMask = applyManualEditsToMask(
+        cleanMask,
+        layer.manualEdits,
+        targetW,
+        targetH,
+        pxPerMm
       );
 
       if (layer.id === activeLayerId) {
         const imgData = new ImageData(targetW, targetH);
-        for (let i = 0; i < cleanMask.data.length; i++) {
-          const val = cleanMask.data[i] === 1 ? 255 : 0;
+        for (let i = 0; i < finalMask.data.length; i++) {
+          const val = finalMask.data[i] === 1 ? 255 : 0;
           imgData.data[i * 4] = val;
           imgData.data[i * 4 + 1] = val;
           imgData.data[i * 4 + 2] = val;
@@ -303,7 +314,7 @@ export const App: React.FC = () => {
       }
 
       // Potrace Vector Tracing Engine
-      const vectorResult = traceBinaryMaskToSVG(cleanMask, {
+      const vectorResult = traceBinaryMaskToSVG(finalMask, {
         turdSize,
         alphaMax,
         optCurve: true,
@@ -318,7 +329,7 @@ export const App: React.FC = () => {
       binaryMaskData: selectedLayerImageData,
       processingResolution: { width: targetW, height: targetH },
     };
-  }, [deferredState, activeTab]);
+  }, [state, activeTab]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-moss-950 text-slate-100">
@@ -385,6 +396,17 @@ export const App: React.FC = () => {
           layerPathDataMap={layerPathDataMap}
           binaryMask={binaryMaskData}
           processingResolution={processingResolution}
+          activeTool={state.activeTool || 'navigate'}
+          setActiveTool={(tool) => updateState(prev => ({ ...prev, activeTool: tool }), false)}
+          bridgeWidthMm={state.bridgeWidthMm || 2.0}
+          setBridgeWidthMm={(width) => updateState(prev => ({ ...prev, bridgeWidthMm: width }), false)}
+          onUpdateManualEdits={(layerId, manualEdits) => {
+            updateState(prev => ({
+              ...prev,
+              layers: prev.layers.map(l => l.id === layerId ? { ...l, manualEdits } : l),
+            }), true);
+          }}
+          onUpdateState={(updater) => updateState(updater, false)}
           onUpdatePosition={(dx, dy) => {
             updateState(prev => ({
               ...prev,
@@ -417,7 +439,7 @@ export const App: React.FC = () => {
             }), true);
           }}
           onCommitTransform={() => {
-            setHistory(h => pushHistorySnapshot(h, state.workingImage));
+            updateState(prev => ({ ...prev }), true);
           }}
           onLoadSamplePattern={loadSamplePattern}
           onFileUpload={handleFileUpload}

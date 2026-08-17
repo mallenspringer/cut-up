@@ -1,71 +1,72 @@
-import { AppState, WorkingImageState } from '../engine/types';
-
-export interface CompositionSnapshot {
-  timestamp: number;
-  workingImage: WorkingImageState;
-}
+import { AppState } from '../engine/types';
 
 export interface HistoryState {
-  past: CompositionSnapshot[];
-  present: CompositionSnapshot;
-  future: CompositionSnapshot[];
+  past: AppState[];
+  present: AppState;
+  future: AppState[];
 }
 
-export function createInitialHistory(workingImage: WorkingImageState): HistoryState {
-  const initialSnapshot: CompositionSnapshot = {
-    timestamp: Date.now(),
-    workingImage: JSON.parse(JSON.stringify(workingImage)),
+/**
+ * Deep-clones editable application state (layers, transforms, canvas settings)
+ * while preserving sourceImage reference without stringifying multi-megabyte ImageData buffers.
+ */
+export function cloneAppState(state: AppState): AppState {
+  return {
+    ...state,
+    sourceImage: state.sourceImage, // Preserved by reference (never JSON.stringified)
+    workingImage: JSON.parse(JSON.stringify(state.workingImage)),
+    layers: JSON.parse(JSON.stringify(state.layers)),
+    canvas: { ...state.canvas },
+    processing: { ...state.processing },
+    output: { ...state.output },
   };
+}
+
+export function createInitialHistory(initialState: AppState): HistoryState {
   return {
     past: [],
-    present: initialSnapshot,
+    present: cloneAppState(initialState),
     future: [],
   };
 }
 
-export function pushHistorySnapshot(history: HistoryState, workingImage: WorkingImageState): HistoryState {
-  const newSnapshot: CompositionSnapshot = {
-    timestamp: Date.now(),
-    workingImage: JSON.parse(JSON.stringify(workingImage)),
-  };
-
+export function pushHistorySnapshot(
+  history: HistoryState,
+  nextState: AppState
+): HistoryState {
   return {
     past: [...history.past, history.present],
-    present: newSnapshot,
+    present: cloneAppState(nextState),
     future: [], // Clear redo stack on divergent edit
   };
 }
 
-export function undoHistory(history: HistoryState): { history: HistoryState; snapshot: CompositionSnapshot | null } {
+export function undoHistory(history: HistoryState): HistoryState {
   if (history.past.length === 0) {
-    return { history, snapshot: null };
+    return history;
   }
 
   const previous = history.past[history.past.length - 1];
   const newPast = history.past.slice(0, history.past.length - 1);
 
-  const newHistory: HistoryState = {
+  return {
     past: newPast,
     present: previous,
     future: [history.present, ...history.future],
   };
-
-  return { history: newHistory, snapshot: previous };
 }
 
-export function redoHistory(history: HistoryState): { history: HistoryState; snapshot: CompositionSnapshot | null } {
+export function redoHistory(history: HistoryState): HistoryState {
   if (history.future.length === 0) {
-    return { history, snapshot: null };
+    return history;
   }
 
   const next = history.future[0];
   const newFuture = history.future.slice(1);
 
-  const newHistory: HistoryState = {
+  return {
     past: [...history.past, history.present],
     present: next,
     future: newFuture,
   };
-
-  return { history: newHistory, snapshot: next };
 }

@@ -1,4 +1,5 @@
 import { LayerState, BinaryMask } from '../types';
+import { applyManualEditsToMask } from './manualEdits';
 
 /** Distinct, harmonious paper layer colors: desaturated ROYGBIV, mid-to-dark grey, pink, chartreuse */
 export const DEFAULT_LAYER_COLORS = [
@@ -148,7 +149,8 @@ export function generateLayerMask(
   height: number,
   layerIndex: number,
   allLayers: LayerState[],
-  alpha?: Uint8Array | null
+  alpha?: Uint8Array | null,
+  pxPerMm?: number
 ): BinaryMask {
   const sortedLayers = [...allLayers].sort((a, b) => a.order - b.order);
   const currentLayer = sortedLayers[layerIndex];

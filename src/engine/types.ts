@@ -58,6 +58,27 @@ export interface ProcessingState {
   smoothing: number; // 0 to 100
 }
 
+export interface ManualBridgeStroke {
+  id: string;
+  x1: number; // normalized 0..1 across canvas printable width
+  y1: number; // normalized 0..1 across canvas printable height
+  x2: number;
+  y2: number;
+  widthMm: number; // physical thickness in mm
+}
+
+export interface ManualFillPoint {
+  id: string;
+  x: number; // normalized 0..1 across canvas printable width
+  y: number; // normalized 0..1 across canvas printable height
+  fillType: 0 | 1; // 1 = solid paper fill, 0 = erase to hole
+}
+
+export interface LayerManualEdits {
+  bridges: ManualBridgeStroke[];
+  fills: ManualFillPoint[];
+}
+
 export interface LayerState {
   id: string;
   threshold: number;      // 0 to 255 (End threshold)
@@ -65,12 +86,15 @@ export interface LayerState {
   isSolidBacking?: boolean; // Default true for Layer 1 (uncut base paper sheet), false for higher layers
   color: string;          // Hex preview color e.g. #3b82f6
   order: number;          // 0 = bottom, higher = upper layer
+  manualEdits?: LayerManualEdits;
 }
 
 export interface OutputState {
   registrationMarks: boolean;
   exportMode: 'combined' | 'package';
 }
+
+export type CanvasTool = 'navigate' | 'wand' | 'bridge';
 
 export interface AppState {
   sourceImage: SourceImage | null;
@@ -80,6 +104,8 @@ export interface AppState {
   layers: LayerState[];
   selectedLayerId?: string;
   output: OutputState;
+  activeTool?: CanvasTool;
+  bridgeWidthMm?: number;
 }
 
 /** Binary material mask: 1 = MATERIAL, 0 = NON_MATERIAL */
