@@ -82,7 +82,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
           <button
             onClick={handleAutoDistribute}
             className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition"
-            title="Auto distribute thresholds evenly"
+            title="Auto distribute cut thresholds evenly"
           >
             <Wand2 className="w-3 h-3" /> Auto
           </button>
@@ -90,7 +90,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
             onClick={handleAddLayer}
             disabled={layers.length >= 11}
             className="btn btn-sm btn-secondary text-sand-200 disabled:opacity-30 disabled:pointer-events-none"
-            title="Add new cut layer (up to 10 cut layers + Layer 0)"
+            title="Add new cut layer (up to 10 cut layers + Layer 0 base)"
           >
             <Plus className="w-3.5 h-3.5" /> Layer
           </button>
@@ -105,8 +105,9 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
           const isSelected = state.selectedLayerId === layer.id || (!state.selectedLayerId && isLayer0);
           const isSolid = layer.isSolidBacking !== false;
 
-          // Streamlined Layer 0 Card (Compact single-height)
+          // Streamlined Layer 0 Card (Solid Base Sheet / Void Foundation)
           if (isLayer0) {
+            const layer1Threshold = sortedLayers[1]?.threshold ?? 0;
             return (
               <div
                 key={layer.id}
@@ -119,8 +120,8 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
                     : 'bg-moss-850 border-sand-800/70 hover:border-sand-700/80'
                 }`}
               >
-                {/* Left: Color Swatch + Name + Active */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* Left: Color Swatch + Name (Compact static width for maximum slider room) */}
+                <div className="flex items-center gap-2 w-[125px] shrink-0">
                   <input
                     type="color"
                     value={layer.color}
@@ -138,40 +139,17 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
                     }`}
                     title={isSolid ? "Assign Layer 0 solid backing color" : "Void mode (transparent)"}
                   />
-                  <div>
-                    <div className="font-medium text-sand-100 flex items-center gap-1.5">
-                      Layer 0
-                      {isSelected && (
-                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
-                          Active
-                        </span>
-                      )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sand-100 truncate">
+                      Layer 0 <span className="text-[10px] text-sand-400 font-normal">(Base)</span>
                     </div>
-                    <div className="text-[10px] text-sand-400 font-mono">
-                      Base: 0 → {layer.threshold}
+                    <div className="text-[10px] text-sand-400 font-mono truncate">
+                      Paper: 0 → {layer1Threshold}
                     </div>
                   </div>
                 </div>
 
-                {/* Center: Max Luminance Slider (Cascades with other layers) */}
-                <div className="flex items-center gap-2 flex-1 max-w-[120px]" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    type="range"
-                    min="0"
-                    max="254"
-                    value={layer.threshold}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 0;
-                      onUpdateState(prev => ({
-                        ...prev,
-                        layers: updateLayerThreshold(prev.layers, layer.id, val),
-                      }));
-                    }}
-                    title={`Layer 0 Base Luminance (0 -> ${layer.threshold})`}
-                  />
-                </div>
-
-                {/* Right: Solid / Void Switch */}
+                {/* Right: Solid / Void Switch + Locked Delete */}
                 <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
@@ -189,7 +167,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
                   <button
                     disabled={true}
                     className="text-sand-600 opacity-20 cursor-not-allowed p-1"
-                    title="Layer 0 is the foundation layer and cannot be deleted"
+                    title="Layer 0 is the base foundation and cannot be deleted"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -199,9 +177,9 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
           }
 
           // Standard Cut Layer Card (Layer 1 to Layer 10)
-          const prevLuminance = sortedLayers[actualIndex - 1].threshold;
-          const minRange = prevLuminance + 1;
           const isTop = actualIndex === sortedLayers.length - 1;
+          const paperMax = isTop ? 255 : sortedLayers[actualIndex + 1].threshold;
+          const paperRange = `${layer.threshold + 1} → ${paperMax}`;
 
           return (
             <div
@@ -215,7 +193,8 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
                   : 'bg-moss-850 border-sand-800/70 hover:border-sand-700/80'
               }`}
             >
-              <div className="flex items-center gap-2 shrink-0">
+              {/* Left: Color Swatch + Name (Compact static width for maximum slider room) */}
+              <div className="flex items-center gap-2 w-[125px] shrink-0">
                 <input
                   type="color"
                   value={layer.color}
@@ -230,27 +209,27 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
                   className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent shrink-0"
                   title={`Assign Layer ${actualIndex} paper color`}
                 />
-                <div>
-                  <div className="font-medium text-sand-100 flex items-center gap-1.5">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sand-100 truncate">
                     Layer {actualIndex}
-                    {isSelected && (
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
-                        Active
-                      </span>
+                    {isTop && (
+                      <span className="text-[10px] text-amber-300/80 font-normal ml-1">(Top)</span>
                     )}
                   </div>
-                  <div className="text-[10px] text-sand-400 font-mono">
-                    Luminance: {minRange} → {layer.threshold}
+                  <div className="text-[10px] text-sand-400 font-mono truncate">
+                    Paper: {paperRange}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-1 max-w-[120px]" onClick={(e) => e.stopPropagation()}>
+              {/* Center Slider: Extended wide track */}
+              <div className="flex items-center gap-2 flex-1 px-1" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="range"
                   min="0"
-                  max={isTop ? "255" : "254"}
+                  max="254"
                   value={layer.threshold}
+                  className="w-full cursor-pointer"
                   onChange={(e) => {
                     const val = parseInt(e.target.value) || 0;
                     onUpdateState(prev => ({
@@ -258,9 +237,11 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
                       layers: updateLayerThreshold(prev.layers, layer.id, val),
                     }));
                   }}
+                  title={`Layer ${actualIndex} Cut Threshold: ≤ ${layer.threshold}`}
                 />
               </div>
 
+              {/* Right: Delete Action */}
               <div className="shrink-0 flex items-center">
                 <button
                   onClick={(e) => {

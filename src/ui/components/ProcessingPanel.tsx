@@ -88,12 +88,8 @@ export const ProcessingPanel: React.FC<ProcessingPanelProps> = ({
             }));
           }}
         />
-        <div className="flex justify-between text-[10px] text-sand-500 font-mono">
-          <span>0 (Crisp / Raw Details)</span>
-          <span>100 (Max Cleanup & Curves)</span>
-        </div>
         <div className="text-[11px] text-sand-400/80">
-          Wipes out high-frequency noise, speckles, & smooths organic contours.
+          Reduces high-frequency noise.
         </div>
       </div>
     </div>

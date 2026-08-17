@@ -1,5 +1,4 @@
-import { LayerState, LayerMode, BinaryMask } from '../types';
-import { thresholdToBinaryMask } from '../luminance/luminance';
+import { LayerState, BinaryMask } from '../types';
 
 /** Distinct, harmonious paper layer colors: desaturated ROYGBIV, mid-to-dark grey, pink, chartreuse */
 export const DEFAULT_LAYER_COLORS = [
@@ -15,19 +14,20 @@ export const DEFAULT_LAYER_COLORS = [
   '#98a349', // 10. Desaturated Chartreuse (Warm Olive-Lime)
 ];
 
+/**
+ * Generates evenly spaced cut thresholds for an N-layer physical stack.
+ * For N total layers (Layer 0 base + N-1 cut layers), returns array of length N.
+ * thresholds[0] = 0 (Base sheet / uncut foundation)
+ * thresholds[i] = Math.round((255 / count) * i) for i = 1..N-1 (cut boundaries in [0, 254])
+ */
 export function generateAutoThresholds(count: number): number[] {
-  if (count <= 1) return [40];
-  if (count === 2) return [40, 255];
+  if (count <= 1) return [0];
   
-  // Distribute thresholds evenly from layer 0 up to 255
-  const step = Math.floor(255 / count);
-  const thresholds: number[] = [];
-  for (let i = 1; i <= count; i++) {
-    if (i === count) {
-      thresholds.push(255);
-    } else {
-      thresholds.push(Math.round(step * i));
-    }
+  const thresholds: number[] = [0];
+  const step = 255 / count;
+  for (let i = 1; i < count; i++) {
+    const val = Math.min(254, Math.round(step * i));
+    thresholds.push(val);
   }
   return thresholds;
 }
@@ -41,8 +41,7 @@ export function createDefaultLayers(count: number = 2): LayerState[] {
     if (index === 0) {
       return {
         id: 'layer-0',
-        threshold: t,
-        minThreshold: 0,
+        threshold: 0,
         isSolidBacking: true, // Solid ON by default on app load
         color: '#111111', // Black for Layer 0
         order: 0,
@@ -60,17 +59,19 @@ export function createDefaultLayers(count: number = 2): LayerState[] {
   });
 }
 
-/** Validates and enforces strict monotonic threshold ordering (T_0 < T_1 < ... < T_n) */
+/** Validates and enforces strict monotonic threshold ordering (0 <= T_1 < T_2 < ... < T_n <= 254) */
 export function enforceMonotonicThresholds(layers: LayerState[]): LayerState[] {
   const sorted = [...layers].sort((a, b) => a.order - b.order);
   let prevVal = -1;
 
   return sorted.map((layer, idx) => {
-    const isTop = idx === sorted.length - 1;
+    if (idx === 0) {
+      return { ...layer, threshold: 0 };
+    }
+
     const minAllowed = prevVal + 1;
-    const maxAllowed = isTop ? 255 : (254 - (sorted.length - 1 - idx));
-    const targetVal = isTop && (layer.threshold >= 254) ? 255 : layer.threshold;
-    const clampedThreshold = Math.max(minAllowed, Math.min(maxAllowed, targetVal));
+    const maxAllowed = 254 - (sorted.length - 1 - idx);
+    const clampedThreshold = Math.max(minAllowed, Math.min(maxAllowed, layer.threshold));
     prevVal = clampedThreshold;
     return {
       ...layer,
@@ -80,10 +81,10 @@ export function enforceMonotonicThresholds(layers: LayerState[]): LayerState[] {
 }
 
 /**
- * Updates a specific layer's threshold with bidirectional cascade pushing:
- * - Dragging down pushes lower layers down
- * - Dragging up pushes higher layers up
- * Strict monotonicity (0 <= T_0 < T_1 < ... < T_n <= 255) is always preserved.
+ * Updates a specific cut layer's threshold with bidirectional cascade pushing:
+ * - Dragging down pushes lower cut layers down
+ * - Dragging up pushes higher cut layers up
+ * Strict monotonicity (0 <= T_1 < T_2 < ... < T_{n-1} <= 254) is always preserved.
  */
 export function updateLayerThreshold(
   layers: LayerState[],
@@ -92,17 +93,16 @@ export function updateLayerThreshold(
 ): LayerState[] {
   const sorted = [...layers].sort((a, b) => a.order - b.order);
   const targetIdx = sorted.findIndex(l => l.id === targetId);
-  if (targetIdx === -1) return layers;
+  if (targetIdx <= 0) return layers; // Layer 0 has no cut slider
 
   const count = sorted.length;
-  const isTop = targetIdx === count - 1;
-  const clampedVal = Math.max(0, Math.min(isTop ? 255 : 254, newThreshold));
+  const clampedVal = Math.max(0, Math.min(254, newThreshold));
 
   const updated: LayerState[] = sorted.map((l, idx) => ({ ...l, order: idx }));
   updated[targetIdx].threshold = clampedVal;
 
-  // 1. Cascade downwards: push lower layers down if needed
-  for (let i = targetIdx - 1; i >= 0; i--) {
+  // 1. Cascade downwards: push lower cut layers down if needed (down to index 1)
+  for (let i = targetIdx - 1; i >= 1; i--) {
     if (updated[i].threshold >= updated[i + 1].threshold) {
       updated[i].threshold = Math.max(0, updated[i + 1].threshold - 1);
     }
@@ -110,24 +110,23 @@ export function updateLayerThreshold(
 
   // If downwards cascade hit the floor (0), compress upwards
   let floor = 0;
-  for (let i = 0; i <= targetIdx; i++) {
+  for (let i = 1; i <= targetIdx; i++) {
     if (updated[i].threshold < floor) {
       updated[i].threshold = floor;
     }
     floor = updated[i].threshold + 1;
   }
 
-  // 2. Cascade upwards: push higher layers up if needed
+  // 2. Cascade upwards: push higher cut layers up if needed
   for (let i = targetIdx + 1; i < count; i++) {
     if (updated[i].threshold <= updated[i - 1].threshold) {
-      const isCurrentTop = i === count - 1;
-      updated[i].threshold = Math.min(isCurrentTop ? 255 : 254, updated[i - 1].threshold + 1);
+      updated[i].threshold = Math.min(254, updated[i - 1].threshold + 1);
     }
   }
 
-  // If upwards cascade hit the ceiling (255), compress downwards
-  let ceiling = 255;
-  for (let i = count - 1; i >= 0; i--) {
+  // If upwards cascade hit the ceiling (254), compress downwards
+  let ceiling = 254;
+  for (let i = count - 1; i >= 1; i--) {
     if (updated[i].threshold > ceiling) {
       updated[i].threshold = ceiling;
     }
@@ -139,7 +138,8 @@ export function updateLayerThreshold(
 
 /**
  * Generates binary mask for a specific layer.
- * Each layer covers its designated luminance range (prevThreshold -> currentLayer.threshold).
+ * Layer 0: 100% solid paper cardstock base (or void)
+ * Layer 1..N-1: Cutout holes where luminance <= currentLayer.threshold (revealing lower layers)
  * Extra-image space (outside photo) is solid paper (1) unioned seamlessly into each sheet.
  */
 export function generateLayerMask(
@@ -148,8 +148,6 @@ export function generateLayerMask(
   height: number,
   layerIndex: number,
   allLayers: LayerState[],
-  mode: LayerMode,
-  negative: boolean,
   alpha?: Uint8Array | null
 ): BinaryMask {
   const sortedLayers = [...allLayers].sort((a, b) => a.order - b.order);
@@ -160,23 +158,20 @@ export function generateLayerMask(
 
   // Layer 0 handling: Solid Backing vs Void (Empty space behind stack)
   if (layerIndex === 0) {
-    if (currentLayer.isSolidBacking === true) {
-      const solidData = new Uint8Array(width * height);
-      solidData.fill(1); // 100% solid paper cardstock base
-      return { width, height, data: solidData };
-    } else {
+    if (currentLayer.isSolidBacking === false) {
       const voidData = new Uint8Array(width * height);
       voidData.fill(0); // 100% void / empty space
       return { width, height, data: voidData };
+    } else {
+      const solidData = new Uint8Array(width * height);
+      solidData.fill(1); // 100% solid paper cardstock base
+      return { width, height, data: solidData };
     }
   }
 
-  const prevThreshold = sortedLayers[layerIndex - 1].threshold;
   const currThreshold = currentLayer.threshold;
   const total = width * height;
   const maskData = new Uint8Array(total);
-
-  const isCumulative = mode === 'cumulative';
 
   for (let i = 0; i < total; i++) {
     if (alpha && alpha[i] < 128) {
@@ -184,22 +179,8 @@ export function generateLayerMask(
       maskData[i] = 1;
     } else {
       const val = luminance[i];
-      let isCutout = false;
-
-      if (isCumulative) {
-        // Cumulative Mode: holes expand progressively on higher threshold layers
-        if (!negative) {
-          isCutout = val <= currThreshold;
-        } else {
-          isCutout = val > currThreshold;
-        }
-      } else {
-        // Exclusive / Band Mode: cutout only for luminance within this layer's discrete band
-        const bandMin = prevThreshold + 1;
-        const inBand = val >= bandMin && val <= currThreshold;
-        isCutout = !negative ? inBand : !inBand;
-      }
-
+      // Cumulative Mode: holes cut out where luminance <= threshold
+      const isCutout = val <= currThreshold;
       // Material mask: 1 = solid paper sheet, 0 = cutout hole
       maskData[i] = isCutout ? 0 : 1;
     }

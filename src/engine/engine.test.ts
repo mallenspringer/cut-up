@@ -27,7 +27,7 @@ describe('Luminance Engine Core Tests', () => {
     expect(lum[1]).toBe(255);
     expect(lum[2]).toBe(128);
 
-    const mask = thresholdToBinaryMask(lum, 2, 2, 100, false);
+    const mask = thresholdToBinaryMask(lum, 2, 2, 100);
     expect(mask.data[0]).toBe(1); // Black <= 100 -> Material
     expect(mask.data[1]).toBe(0); // White > 100 -> Non-material
   });
@@ -70,7 +70,8 @@ describe('Luminance Engine Core Tests', () => {
   it('4. Auto Threshold Distribution', () => {
     const t5 = generateAutoThresholds(5);
     expect(t5.length).toBe(5);
-    for (let i = 1; i < t5.length; i++) {
+    expect(t5[0]).toBe(0); // Layer 0 base
+    for (let i = 2; i < t5.length; i++) {
       expect(t5[i]).toBeGreaterThan(t5[i - 1]);
     }
   });
@@ -104,57 +105,40 @@ describe('Luminance Engine Core Tests', () => {
     expect(resultUnsmoothed.data).toEqual(mask.data); // Unsmoothed mask returns exact original mask reference
   });
 
-  it('7. Cumulative vs Exclusive Layer Mask Generation & Layer 0 Solid/Void', () => {
+  it('7. Cumulative Layer Mask Generation & Layer 0 Solid/Void', () => {
     // 3 pixels with luminance 30, 80, 150
     const lum = new Uint8Array([30, 80, 150]);
     const layers = [
-      { id: 'layer-0', threshold: 20, isSolidBacking: true, color: '#111', order: 0 },
+      { id: 'layer-0', threshold: 0, isSolidBacking: true, color: '#111', order: 0 },
       { id: 'layer-1', threshold: 50, isSolidBacking: false, color: '#c75d50', order: 1 },
       { id: 'layer-2', threshold: 100, isSolidBacking: false, color: '#cc7d43', order: 2 },
       { id: 'layer-3', threshold: 200, isSolidBacking: false, color: '#cfaa4a', order: 3 },
     ];
 
     // Layer 0 Solid -> 100% solid paper (all 1s)
-    const solidL0 = generateLayerMask(lum, 3, 1, 0, layers, 'cumulative', false);
+    const solidL0 = generateLayerMask(lum, 3, 1, 0, layers);
     expect(solidL0.data[0]).toBe(1);
     expect(solidL0.data[1]).toBe(1);
     expect(solidL0.data[2]).toBe(1);
 
     // Layer 0 Void -> 100% void (all 0s)
     const voidLayers = [{ ...layers[0], isSolidBacking: false }, ...layers.slice(1)];
-    const voidL0 = generateLayerMask(lum, 3, 1, 0, voidLayers, 'cumulative', false);
+    const voidL0 = generateLayerMask(lum, 3, 1, 0, voidLayers);
     expect(voidL0.data[0]).toBe(0);
     expect(voidL0.data[1]).toBe(0);
     expect(voidL0.data[2]).toBe(0);
 
-    // Cut Layer 1 (threshold 50): lum 30 <= 50 -> cutout (0), lum 80 > 50 -> solid (1)
-    const cumL1 = generateLayerMask(lum, 3, 1, 1, layers, 'cumulative', false);
+    // Cut Layer 1 (threshold 50): lum 30 <= 50 -> cutout (0), lum 80, 150 > 50 -> solid (1)
+    const cumL1 = generateLayerMask(lum, 3, 1, 1, layers);
     expect(cumL1.data[0]).toBe(0); // Cutout
     expect(cumL1.data[1]).toBe(1); // Solid paper
     expect(cumL1.data[2]).toBe(1); // Solid paper
 
     // Cut Layer 2 (threshold 100): lum 30, 80 <= 100 -> cutout (0), lum 150 > 100 -> solid (1)
-    const cumL2 = generateLayerMask(lum, 3, 1, 2, layers, 'cumulative', false);
+    const cumL2 = generateLayerMask(lum, 3, 1, 2, layers);
     expect(cumL2.data[0]).toBe(0);
     expect(cumL2.data[1]).toBe(0);
     expect(cumL2.data[2]).toBe(1);
-
-    // Exclusive mode: each cut layer cuts ONLY its discrete band
-    const excL1 = generateLayerMask(lum, 3, 1, 1, layers, 'exclusive', false);
-    const excL2 = generateLayerMask(lum, 3, 1, 2, layers, 'exclusive', false);
-    const excL3 = generateLayerMask(lum, 3, 1, 3, layers, 'exclusive', false);
-
-    expect(excL1.data[0]).toBe(0); // Band 21-50: cut
-    expect(excL1.data[1]).toBe(1);
-    expect(excL1.data[2]).toBe(1);
-
-    expect(excL2.data[0]).toBe(1);
-    expect(excL2.data[1]).toBe(0); // Band 51-100: cut
-    expect(excL2.data[2]).toBe(1);
-
-    expect(excL3.data[0]).toBe(1);
-    expect(excL3.data[1]).toBe(1);
-    expect(excL3.data[2]).toBe(0); // Band 101-200: cut
   });
 
   it('8. Post-Crop Aspect Ratio Preservation during Resampling', () => {
@@ -232,7 +216,7 @@ describe('Luminance Engine Core Tests', () => {
       { id: 'layer-0', threshold: 0, color: '#111', order: 0, isSolidBacking: true },
       { id: 'layer-1', threshold: 100, color: '#123456', order: 1, isSolidBacking: false },
     ];
-    const mask = generateLayerMask(lum, width, height, 1, layers, 'cumulative', false, alpha);
+    const mask = generateLayerMask(lum, width, height, 1, layers, alpha);
 
     // All margin pixels (where alpha=0) MUST be solid paper (1)
     expect(mask.data[0]).toBe(1); // (0,0) margin -> solid
@@ -272,23 +256,22 @@ describe('Luminance Engine Core Tests', () => {
 
   it('11. Bidirectional Cascading Layer Threshold Updates', () => {
     const layers = [
-      { id: 'layer-0', threshold: 40, isSolidBacking: true, color: '#111', order: 0 },
+      { id: 'layer-0', threshold: 0, isSolidBacking: true, color: '#111', order: 0 },
       { id: 'layer-1', threshold: 100, isSolidBacking: false, color: '#c75d50', order: 1 },
       { id: 'layer-2', threshold: 180, isSolidBacking: false, color: '#cc7d43', order: 2 },
-      { id: 'layer-3', threshold: 255, isSolidBacking: false, color: '#cfaa4a', order: 3 },
+      { id: 'layer-3', threshold: 240, isSolidBacking: false, color: '#cfaa4a', order: 3 },
     ];
 
-    // Drag Layer 1 DOWN to 30 -> pushes Layer 0 down to 29
-    const cascadedDown = updateLayerThreshold(layers, 'layer-1', 30);
-    expect(cascadedDown.find(l => l.id === 'layer-1')?.threshold).toBe(30);
-    expect(cascadedDown.find(l => l.id === 'layer-0')?.threshold).toBe(29);
-    expect(cascadedDown.find(l => l.id === 'layer-2')?.threshold).toBe(180);
+    // Drag Layer 2 DOWN to 80 -> pushes Layer 1 down to 79
+    const cascadedDown = updateLayerThreshold(layers, 'layer-2', 80);
+    expect(cascadedDown.find(l => l.id === 'layer-2')?.threshold).toBe(80);
+    expect(cascadedDown.find(l => l.id === 'layer-1')?.threshold).toBe(79);
+    expect(cascadedDown.find(l => l.id === 'layer-3')?.threshold).toBe(240);
 
     // Drag Layer 1 UP to 200 -> pushes Layer 2 up to 201
     const cascadedUp = updateLayerThreshold(layers, 'layer-1', 200);
     expect(cascadedUp.find(l => l.id === 'layer-1')?.threshold).toBe(200);
     expect(cascadedUp.find(l => l.id === 'layer-2')?.threshold).toBe(201);
-    expect(cascadedUp.find(l => l.id === 'layer-3')?.threshold).toBe(255);
-    expect(cascadedUp.find(l => l.id === 'layer-0')?.threshold).toBe(40);
+    expect(cascadedUp.find(l => l.id === 'layer-3')?.threshold).toBe(240);
   });
 });

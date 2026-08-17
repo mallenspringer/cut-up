@@ -41,9 +41,8 @@ export function extractAlpha(buffer: ResampledBuffer): Uint8Array {
 }
 
 /**
- * Converts luminance buffer to binary material mask based on numeric threshold (0-255) and polarity.
- * Positive polarity (default): Darker pixels (lum <= threshold) = MATERIAL (1).
- * Negative polarity: Lighter pixels (lum > threshold) = MATERIAL (1).
+ * Converts luminance buffer to binary material mask based on numeric threshold (0-255).
+ * Darker pixels (lum <= threshold) = MATERIAL (1).
  * Empty un-imaged page space (alpha < 128) = MATERIAL (1) (solid paper cardstock).
  */
 export function thresholdToBinaryMask(
@@ -51,29 +50,16 @@ export function thresholdToBinaryMask(
   width: number,
   height: number,
   threshold: number,
-  negative: boolean,
   alpha?: Uint8Array | null
 ): BinaryMask {
   const mask = new Uint8Array(width * height);
   const total = width * height;
 
-  if (!negative) {
-    // Standard positive mode: Darker <= threshold is material, AND empty page space (alpha < 128) is solid paper material (1)
-    for (let i = 0; i < total; i++) {
-      if (alpha && alpha[i] < 128) {
-        mask[i] = 1;
-      } else {
-        mask[i] = luminance[i] <= threshold ? 1 : 0;
-      }
-    }
-  } else {
-    // Negative mode: Lighter > threshold is material, AND empty page space (alpha < 128) is solid paper material (1)
-    for (let i = 0; i < total; i++) {
-      if (alpha && alpha[i] < 128) {
-        mask[i] = 1;
-      } else {
-        mask[i] = luminance[i] > threshold ? 1 : 0;
-      }
+  for (let i = 0; i < total; i++) {
+    if (alpha && alpha[i] < 128) {
+      mask[i] = 1;
+    } else {
+      mask[i] = luminance[i] <= threshold ? 1 : 0;
     }
   }
 

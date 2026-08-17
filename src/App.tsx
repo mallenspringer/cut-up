@@ -15,7 +15,6 @@ import { ImageTransformPanel } from './ui/components/ImageTransformPanel';
 import { ProcessingPanel } from './ui/components/ProcessingPanel';
 import { CanvasSettingsPanel } from './ui/components/CanvasSettingsPanel';
 import { LayerManagerPanel } from './ui/components/LayerManagerPanel';
-import { StackingModePanel } from './ui/components/StackingModePanel';
 import { ExportPanel } from './ui/components/ExportPanel';
 
 import { Scissors, Upload, Undo2, Redo2 } from 'lucide-react';
@@ -60,8 +59,6 @@ const DEFAULT_APP_STATE: AppState = {
     orientation: 'portrait',
   },
   processing: {
-    mode: 'cumulative',
-    negative: false,
     minimumFeatureSize: 2.0, // 2mm
     smoothing: 0,
   },
@@ -282,8 +279,6 @@ export const App: React.FC = () => {
         targetH,
         idx,
         deferredState.layers,
-        deferredState.processing.mode,
-        deferredState.processing.negative,
         alpha
       );
 
@@ -333,20 +328,23 @@ export const App: React.FC = () => {
           <div className="w-8 h-8 rounded-lg bg-emerald-700 flex items-center justify-center shadow-md shadow-stone-900/25 border border-emerald-800/40">
             <Scissors className="w-5 h-5 text-white" />
           </div>
-          <div className="flex items-center">
+          <div className="flex items-baseline gap-2.5">
             <h1 className="font-bungee text-[32px] tracking-wide uppercase text-[#25282b] select-none leading-none">
               Cut Up
             </h1>
+            <span className="text-xs font-sans font-semibold text-black tracking-wide select-none">
+              V 1.0
+            </span>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-white/90 p-1 rounded-lg border border-[#555a60]/50 shadow-sm">
+          <div className="flex items-center gap-1 bg-[#142017]/90 backdrop-blur-md border border-sand-700/90 p-1 rounded-lg shadow-md text-xs text-white">
             <button
               onClick={handleUndo}
               disabled={history.past.length === 0}
-              className="p-1.5 hover:bg-stone-200/70 text-[#2e3236] hover:text-black rounded disabled:opacity-30 disabled:pointer-events-none transition"
+              className="p-1.5 hover:bg-[#223627] text-white hover:text-sand-100 rounded disabled:opacity-30 disabled:pointer-events-none transition"
               title="Undo composition edit (Ctrl+Z)"
             >
               <Undo2 className="w-4 h-4" />
@@ -354,7 +352,7 @@ export const App: React.FC = () => {
             <button
               onClick={handleRedo}
               disabled={history.future.length === 0}
-              className="p-1.5 hover:bg-stone-200/70 text-[#2e3236] hover:text-black rounded disabled:opacity-30 disabled:pointer-events-none transition"
+              className="p-1.5 hover:bg-[#223627] text-white hover:text-sand-100 rounded disabled:opacity-30 disabled:pointer-events-none transition"
               title="Redo composition edit (Ctrl+Shift+Z)"
             >
               <Redo2 className="w-4 h-4" />
@@ -460,11 +458,6 @@ export const App: React.FC = () => {
             onUpdateState={(updater) => updateState(updater, false)}
           />
 
-          <StackingModePanel
-            state={state}
-            onUpdateState={(updater) => updateState(updater, false)}
-          />
-
           <ExportPanel
             state={state}
             layerPathDataMap={layerPathDataMap}
@@ -474,7 +467,7 @@ export const App: React.FC = () => {
 
           {/* App Footer */}
           <footer className="p-4 mt-auto border-t border-sand-800/70 text-center text-xs text-sand-400/90 leading-relaxed bg-moss-950/30">
-            <div>Copyright 2026 M. Springer</div>
+            <div>© 2026 M. Springer</div>
             <div>
               a{' '}
               <a

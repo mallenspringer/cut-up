@@ -53,11 +53,7 @@ export interface CanvasState {
   orientation: 'portrait' | 'landscape';
 }
 
-export type LayerMode = 'cumulative' | 'exclusive';
-
 export interface ProcessingState {
-  mode: LayerMode;
-  negative: boolean;
   minimumFeatureSize: number; // in physical unit (mm)
   smoothing: number; // 0 to 100
 }
