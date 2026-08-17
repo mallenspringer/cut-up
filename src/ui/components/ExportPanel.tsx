@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppState } from '../../engine/types';
-import { generateCombinedSVG } from '../../export/svgGenerator';
-import { exportCombinedSVGFile, exportLayerPackageZIP } from '../../export/zipExporter';
 import { Download, Archive, Printer, Target } from 'lucide-react';
+import { ExportModal, ExportModalMode } from './ExportModal';
 
 interface ExportPanelProps {
   state: AppState;
@@ -17,28 +16,8 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   processingResolution,
   onUpdateState,
 }) => {
-  const { canvas, layers, output } = state;
-
-  const handleExportCombinedSVG = () => {
-    const svgContent = generateCombinedSVG(
-      layerPathDataMap,
-      layers,
-      canvas,
-      output.registrationMarks,
-      processingResolution
-    );
-    exportCombinedSVGFile(svgContent, `cutup-combined-${Date.now()}.svg`);
-  };
-
-  const handleExportZIPPackage = () => {
-    exportLayerPackageZIP(
-      layerPathDataMap,
-      layers,
-      canvas,
-      output.registrationMarks,
-      processingResolution
-    );
-  };
+  const { output } = state;
+  const [modalMode, setModalMode] = useState<ExportModalMode>(null);
 
   const handlePrint = () => {
     window.print();
@@ -71,14 +50,14 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
 
       <div className="space-y-2">
         <button
-          onClick={handleExportCombinedSVG}
+          onClick={() => setModalMode('combined')}
           className="w-full btn btn-primary flex items-center justify-center gap-2"
         >
           <Download className="w-4 h-4" /> Export Combined SVG
         </button>
 
         <button
-          onClick={handleExportZIPPackage}
+          onClick={() => setModalMode('zip')}
           className="w-full btn btn-secondary flex items-center justify-center gap-2 text-sand-200"
         >
           <Archive className="w-4 h-4 text-emerald-400" /> Export Layer Package (.zip)
@@ -91,6 +70,16 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
           <Printer className="w-4 h-4 text-sand-400" /> Print (100% Scale)
         </button>
       </div>
+
+      {/* Export Naming & Confirmation Modal */}
+      <ExportModal
+        isOpen={modalMode !== null}
+        mode={modalMode}
+        state={state}
+        layerPathDataMap={layerPathDataMap}
+        processingResolution={processingResolution}
+        onClose={() => setModalMode(null)}
+      />
     </div>
   );
 };

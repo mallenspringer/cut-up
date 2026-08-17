@@ -21,10 +21,15 @@ export function exportLayerPackageZIP(
   layers: LayerState[],
   canvas: CanvasState,
   registrationMarks: boolean = false,
-  processingResolution?: { width: number; height: number }
+  processingResolution?: { width: number; height: number },
+  zipFilename: string = `cutup-layers-${Date.now()}.zip`,
+  layerPrefix?: string
 ): void {
   const sortedLayers = [...layers].sort((a, b) => a.order - b.order);
   const zipFiles: Record<string, Uint8Array> = {};
+
+  const cleanPrefix = layerPrefix ? layerPrefix.trim().replace(/[^a-zA-Z0-9_-]/g, '_') : '';
+  const prefixStr = cleanPrefix ? `${cleanPrefix}-` : '';
 
   sortedLayers.forEach((layer, idx) => {
     const isLayer0 = idx === 0;
@@ -39,19 +44,21 @@ export function exportLayerPackageZIP(
     const padIdx = String(idx).padStart(2, '0');
     const padThresh = String(layer.threshold).padStart(3, '0');
     const filename = isLayer0
-      ? `layer-00-backing-solid.svg`
-      : `layer-${padIdx}-threshold-${padThresh}.svg`;
+      ? `${prefixStr}layer-00-backing-solid.svg`
+      : `${prefixStr}layer-${padIdx}-threshold-${padThresh}.svg`;
 
     zipFiles[filename] = strToU8(svgStr);
   });
 
   const zippedData = zipSync(zipFiles);
   const blob = new Blob([zippedData], { type: 'application/zip' });
-  downloadBlob(blob, `cutup-layers-${Date.now()}.zip`);
+  const finalZipName = zipFilename.trim().endsWith('.zip') ? zipFilename.trim() : `${zipFilename.trim()}.zip`;
+  downloadBlob(blob, finalZipName || `cutup-layers-${Date.now()}.zip`);
 }
 
 /** Exports single combined SVG file */
 export function exportCombinedSVGFile(svgContent: string, filename: string = 'cutup-pattern-combined.svg') {
+  const finalFilename = filename.trim().endsWith('.svg') ? filename.trim() : `${filename.trim()}.svg`;
   const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-  downloadBlob(blob, filename);
+  downloadBlob(blob, finalFilename || `cutup-combined-${Date.now()}.svg`);
 }
