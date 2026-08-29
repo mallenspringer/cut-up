@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppState, Unit } from '../../engine/types';
-import { CANVAS_PRESETS } from '../../engine/layout/canvasLayout';
+import { CANVAS_PRESETS, convertToInches, convertFromInches } from '../../engine/layout/canvasLayout';
 import { Layout, Smartphone, Monitor } from 'lucide-react';
 import { CollapsibleSection } from './CollapsibleSection';
 
@@ -65,6 +65,15 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
                 const isLandscape = canvas.orientation === 'landscape';
                 const w = isLandscape ? Math.max(preset.width, preset.height) : Math.min(preset.width, preset.height);
                 const h = isLandscape ? Math.min(preset.width, preset.height) : Math.max(preset.width, preset.height);
+
+                // Convert margin to new preset unit seamlessly
+                let convertedMargin = canvas.margin;
+                if (canvas.unit !== preset.unit) {
+                  const marginInches = convertToInches(canvas.margin, canvas.unit);
+                  convertedMargin = convertFromInches(marginInches, preset.unit);
+                  convertedMargin = Math.round(convertedMargin * 100) / 100;
+                }
+
                 onUpdateState(prev => ({
                   ...prev,
                   canvas: {
@@ -72,6 +81,7 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
                     width: w,
                     height: h,
                     unit: preset.unit,
+                    margin: convertedMargin,
                   },
                 }));
               }
@@ -152,8 +162,23 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
           <select
             value={canvas.unit}
             onChange={(e) => {
-              const unit = e.target.value as Unit;
-              onUpdateState(prev => ({ ...prev, canvas: { ...prev.canvas, unit } }));
+              const newUnit = e.target.value as Unit;
+              if (newUnit !== canvas.unit) {
+                const wInches = convertToInches(canvas.width, canvas.unit);
+                const hInches = convertToInches(canvas.height, canvas.unit);
+                const marginInches = convertToInches(canvas.margin, canvas.unit);
+
+                onUpdateState(prev => ({
+                  ...prev,
+                  canvas: {
+                    ...prev.canvas,
+                    width: Math.round(convertFromInches(wInches, newUnit) * 100) / 100,
+                    height: Math.round(convertFromInches(hInches, newUnit) * 100) / 100,
+                    margin: Math.round(convertFromInches(marginInches, newUnit) * 100) / 100,
+                    unit: newUnit,
+                  },
+                }));
+              }
             }}
             className="w-full"
           >
