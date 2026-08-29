@@ -402,7 +402,7 @@ export const App: React.FC = () => {
     const activeLayerId = state.selectedLayerId || (state.layers[1] ? state.layers[1].id : state.layers[0]?.id);
 
     state.layers.forEach((layer: LayerState, idx: number) => {
-      const cacheKey = `${layer.id}:${layer.threshold}:${effectiveClearance}:${effectiveSmoothing}:${cornerStyle}:${JSON.stringify(filter || {})}:${JSON.stringify(layer.manualEdits || {})}`;
+      const cacheKey = `${layer.id}:${layer.threshold}:${targetW}x${targetH}:${state.canvas.width}x${state.canvas.height}${state.canvas.unit}:${state.canvas.margin}:${effectiveClearance}:${effectiveSmoothing}:${cornerStyle}:${JSON.stringify(filter || {})}:${JSON.stringify(layer.manualEdits || {})}`;
       let pathData = vectorPathCacheRef.current.get(cacheKey);
 
       // If this is the active layer (for binary mask preview) or if path data is missing from cache, generate mask
