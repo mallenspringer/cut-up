@@ -28,6 +28,7 @@ describe('User Preferences & Storage Manager', () => {
     expect(prefs.layerShadowOpacity).toBe(0.25);
     expect(prefs.enableCookiePersistence).toBe(false);
     expect(prefs.cookieConsentDismissed).toBe(false);
+    expect(prefs.printWithMargins).toBe(true);
     expect(prefs.paperTexture).toBe('off');
     expect(prefs.textureStrengths.smooth_bristol).toBe(0.10);
     expect(prefs.textureStrengths.cold_press).toBe(0.10);

@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { AppState } from '../../engine/types';
 import { Download, Archive, Printer, Target } from 'lucide-react';
 import { ExportModal, ExportModalMode } from './ExportModal';
+import { CollapsibleSection } from './CollapsibleSection';
 
 interface ExportPanelProps {
   state: AppState;
   layerPathDataMap: Map<string, string>;
   processingResolution?: { width: number; height: number };
   onUpdateState?: (updater: (prev: AppState) => AppState) => void;
+  defaultOpen?: boolean;
 }
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({
@@ -15,6 +17,7 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   layerPathDataMap,
   processingResolution,
   onUpdateState,
+  defaultOpen = true,
 }) => {
   const { output } = state;
   const [modalMode, setModalMode] = useState<ExportModalMode>(null);
@@ -24,10 +27,11 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
   };
 
   return (
-    <div className="p-4 space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-sand-300">
-        Export & Print Geometry
-      </h3>
+    <CollapsibleSection
+      title="Export & Print"
+      icon={<Download className="w-4 h-4" />}
+      defaultOpen={defaultOpen}
+    >
 
       {/* Registration Marks */}
       {onUpdateState && (
@@ -80,6 +84,6 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({
         processingResolution={processingResolution}
         onClose={() => setModalMode(null)}
       />
-    </div>
+    </CollapsibleSection>
   );
 };

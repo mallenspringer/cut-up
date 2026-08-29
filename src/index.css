@@ -232,3 +232,76 @@ input[type="range"]::-webkit-slider-thumb:hover {
   background: #22c55e;
   border-color: rgba(255, 255, 255, 0.4);
 }
+
+/* High-Quality Direct Browser Print & PDF Export Stylesheet */
+@media print {
+  /* Hide all application shell, navigation, sidebars, headers, footers, toolbars, and toasts */
+  header,
+  aside,
+  footer,
+  .nav-tab,
+  .floating-toolbar,
+  .zoom-controls,
+  .guidance-toast,
+  .print-hide,
+  [role="dialog"] {
+    display: none !important;
+  }
+
+  html, body, #root, #root > div, .flex-1, div {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Strip workbench background patterns */
+  .workbench-theme-drafting,
+  .workbench-theme-cutting_mat,
+  .workbench-theme-clean_gray {
+    background: none !important;
+    background-image: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Isolate printable page sheet */
+  .print-target-page {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+    background: transparent !important;
+    page-break-inside: avoid !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 999999 !important;
+  }
+
+  /* Suppress drop-shadows during print if disabled by user preference */
+  .no-print-shadow {
+    filter: none !important;
+  }
+}

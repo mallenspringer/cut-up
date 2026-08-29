@@ -96,11 +96,36 @@ export interface OutputState {
 
 export type CanvasTool = 'navigate' | 'wand' | 'bridge';
 
+export type AestheticFilterType = 'none' | 'pixelate' | 'voronoi';
+
+export interface PixelateFilterConfig {
+  blockSizeMm: number; // 1.0 to 15.0 mm (default: 4.0mm)
+  sampleMethod: 'mean' | 'median'; // default: 'mean'
+  gridSnap: boolean; // default: true
+  cornerStyle: 'orthogonal' | 'rounded'; // default: 'orthogonal' (90° parallel/perpendicular cuts)
+}
+
+export interface VoronoiFilterConfig {
+  facetCount: number; // 30 to 600 (default: 150)
+  jitter: number; // 0 to 100% (default: 65%)
+  sampleMethod: 'mean' | 'median'; // default: 'mean'
+  seed: number; // integer random seed (default: 1)
+  cornerStyle: 'orthogonal' | 'rounded'; // default: 'orthogonal' (sharp straight facets)
+}
+
+export interface AestheticFilterState {
+  enabled: boolean;
+  type: AestheticFilterType;
+  pixelate: PixelateFilterConfig;
+  voronoi: VoronoiFilterConfig;
+}
+
 export interface AppState {
   sourceImage: SourceImage | null;
   workingImage: WorkingImageState;
   canvas: CanvasState;
   processing: ProcessingState;
+  aestheticFilter: AestheticFilterState;
   layers: LayerState[];
   selectedLayerId?: string;
   output: OutputState;

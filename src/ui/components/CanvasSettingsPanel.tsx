@@ -2,15 +2,18 @@ import React from 'react';
 import { AppState, Unit } from '../../engine/types';
 import { CANVAS_PRESETS } from '../../engine/layout/canvasLayout';
 import { Layout, Smartphone, Monitor } from 'lucide-react';
+import { CollapsibleSection } from './CollapsibleSection';
 
 interface CanvasSettingsPanelProps {
   state: AppState;
   onUpdateState: (updater: (prev: AppState) => AppState) => void;
+  defaultOpen?: boolean;
 }
 
 export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
   state,
   onUpdateState,
+  defaultOpen = true,
 }) => {
   const { canvas } = state;
 
@@ -39,10 +42,11 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
   };
 
   return (
-    <div className="p-4 space-y-4 border-b border-sand-800/70">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-sand-300 flex items-center gap-2">
-        <Layout className="w-4 h-4 text-emerald-400" /> Page
-      </h3>
+    <CollapsibleSection
+      title="Page Layout"
+      icon={<Layout className="w-4 h-4" />}
+      defaultOpen={defaultOpen}
+    >
 
       {/* Preset Selector & Orientation Toggle */}
       <div className="space-y-2">
@@ -178,6 +182,6 @@ export const CanvasSettingsPanel: React.FC<CanvasSettingsPanelProps> = ({
           className="w-full"
         />
       </div>
-    </div>
+    </CollapsibleSection>
   );
 };

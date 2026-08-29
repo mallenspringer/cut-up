@@ -480,9 +480,9 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
       : 'workbench-theme-drafting';
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-moss-950 relative">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-moss-950 relative print:bg-transparent print:p-0 print:m-0">
       {/* Top Preview Tab & Interactive Tool Selector */}
-      <div className="h-[43px] border-b border-sand-800/70 bg-moss-900 px-4 flex items-center justify-between z-10 shrink-0 shadow-sm">
+      <div className="h-[43px] border-b border-sand-800/70 bg-moss-900 px-4 flex items-center justify-between z-10 shrink-0 shadow-sm print-hide">
         <div className="flex items-center space-x-1 h-full">
           <button
             className={`nav-tab ${activeTab === 'source' ? 'active' : ''}`}
@@ -631,10 +631,15 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
-            {/* Rubberband Drag-to-Crop Overlay */}
-            {isCropToolActive && rubberband && (
+        {/* Dynamic @page CSS for Browser Print / PDF Export */}
+        <style>
+          {`@page { size: ${canvas.width}${canvas.unit} ${canvas.height}${canvas.unit}; margin: 0; }`}
+        </style>
+
+        {/* Rubberband Drag-to-Crop Overlay */}
+        {isCropToolActive && rubberband && (
           <div
-            className="fixed border-2 border-dashed border-emerald-500 bg-emerald-500/25 pointer-events-none z-50 rounded shadow-2xl"
+            className="fixed border-2 border-dashed border-emerald-500 bg-emerald-500/25 pointer-events-none z-50 rounded shadow-2xl print-hide"
             style={{
               left: `${rubberband.left}px`,
               top: `${rubberband.top}px`,
@@ -647,7 +652,9 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
         {/* Physical Paper Page Frame with Scale Zoom */}
         <div
           ref={pageFrameRef}
-          className="bg-white relative transition-transform duration-75 border border-sand-700/60 overflow-hidden flex items-center justify-center shrink-0"
+          className={`bg-white relative transition-transform duration-75 border border-sand-700/60 overflow-hidden flex items-center justify-center shrink-0 print-target-page ${
+            preferences?.printWithMargins === false ? 'print-no-margins' : ''
+          }`}
           style={{
             width: `${widthPx}px`,
             height: `${heightPx}px`,
@@ -825,7 +832,9 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
                 return (
                   <svg
                     key={layer.id}
-                    className="absolute inset-0 w-full h-full pointer-events-none transition-all duration-150"
+                    className={`absolute inset-0 w-full h-full pointer-events-none transition-all duration-150 ${
+                      preferences?.printWithShadows === false ? 'no-print-shadow' : ''
+                    }`}
                     style={{
                       filter: filterStyle,
                     }}
@@ -920,7 +929,7 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
 
           {/* Overlaid Margin Guide (z-index: 40 on top of image and cut paths) */}
           <div
-            className="absolute border border-dashed border-indigo-400/70 pointer-events-none z-40"
+            className="absolute border border-dashed border-indigo-400/70 pointer-events-none z-40 print-hide"
             style={{
               top: `${marginPx}px`,
               left: `${marginPx}px`,
@@ -933,7 +942,7 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
 
       {/* Floating Active Tool Toast Guide (Bottom-Left) */}
       {activeTab !== 'source' && activeTab !== 'binary' && (activeTool === 'wand' || activeTool === 'bridge') && (
-        <div className="absolute bottom-4 left-4 z-50 bg-[#142017]/95 backdrop-blur-md border border-sand-700/90 px-3 py-2 rounded-lg shadow-2xl text-xs text-sand-200 flex items-center gap-2">
+        <div className="absolute bottom-4 left-4 z-50 bg-[#142017]/95 backdrop-blur-md border border-sand-700/90 px-3 py-2 rounded-lg shadow-2xl text-xs text-sand-200 flex items-center gap-2 print-hide">
           {activeTool === 'wand' ? (
             <>
               <Wand2 className="w-4 h-4 text-emerald-400 animate-pulse" />
@@ -954,14 +963,14 @@ export const CanvasViewport: React.FC<CanvasViewportProps> = ({
 
       {/* Floating Guidance Toast */}
       {toastMessage && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-moss-900/95 text-sand-100 border border-emerald-500/70 shadow-2xl px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-moss-900/95 text-sand-100 border border-emerald-500/70 shadow-2xl px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-200 print-hide">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* FIXED Bottom-Right Zoom Control Cluster (Pinned to outer viewport corner) */}
-      <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-[#142017]/90 backdrop-blur-md border border-sand-700/90 p-1.5 rounded-lg shadow-2xl text-xs text-white">
+      <div className="absolute bottom-4 right-4 z-50 flex items-center gap-1 bg-[#142017]/90 backdrop-blur-md border border-sand-700/90 p-1.5 rounded-lg shadow-2xl text-xs text-white print-hide">
         <button
           onClick={() => setZoom(z => Math.max(0.25, z / 1.25))}
           className="p-1.5 hover:bg-[#223627] rounded text-white hover:text-sand-100 transition"

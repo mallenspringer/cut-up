@@ -1,9 +1,17 @@
 import { SourceImage, WorkingImageState } from '../types';
 
+export interface ImagePlacementBounds {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export interface ResampledBuffer {
   width: number;
   height: number;
   data: Uint8ClampedArray; // RGBA
+  imageBounds?: ImagePlacementBounds;
 }
 
 /**
@@ -115,5 +123,11 @@ export function resampleWorkingImage(
     width: targetWidth,
     height: targetHeight,
     data: result,
+    imageBounds: {
+      left: scaledLeft,
+      top: scaledTop,
+      width: scaledWidth,
+      height: scaledHeight,
+    },
   };
 }

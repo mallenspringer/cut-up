@@ -1,17 +1,20 @@
 import React from 'react';
 import { AppState } from '../../engine/types';
 import { Move, Crop, RotateCcw } from 'lucide-react';
+import { CollapsibleSection } from './CollapsibleSection';
 
 interface ImageTransformPanelProps {
   state: AppState;
   onUpdateState: (updater: (prev: AppState) => AppState) => void;
   onResetTransform: () => void;
+  defaultOpen?: boolean;
 }
 
 export const ImageTransformPanel: React.FC<ImageTransformPanelProps> = ({
   state,
   onUpdateState,
   onResetTransform,
+  defaultOpen = true,
 }) => {
   const { workingImage, sourceImage } = state;
   const cropGeom = workingImage.crop.geometry;
@@ -33,19 +36,24 @@ export const ImageTransformPanel: React.FC<ImageTransformPanelProps> = ({
   };
 
   return (
-    <div className="p-4 space-y-4 border-b border-sand-800/70">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-sand-300 flex items-center gap-2">
-          <Move className="w-4 h-4 text-emerald-400" /> Image Transform
-        </h3>
+    <CollapsibleSection
+      title="Image Transform"
+      icon={<Move className="w-4 h-4" />}
+      defaultOpen={defaultOpen}
+      badge={
         <button
-          onClick={onResetTransform}
-          className="text-xs text-sand-400 hover:text-sand-100 flex items-center gap-1 transition"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onResetTransform();
+          }}
+          className="text-[11px] text-sand-400 hover:text-sand-100 flex items-center gap-1 transition px-1.5 py-0.5 rounded hover:bg-sand-800/60"
           title="Reset position & scale"
         >
-          <RotateCcw className="w-3 h-3" /> Reset All
+          <RotateCcw className="w-3 h-3" /> Reset
         </button>
-      </div>
+      }
+    >
 
       {/* Position & Scale Inputs */}
       <div className="grid grid-cols-2 gap-3 text-xs">
@@ -278,6 +286,6 @@ export const ImageTransformPanel: React.FC<ImageTransformPanelProps> = ({
         <div>• Shift + Drag allows non-proportional X/Y stretching</div>
         <div>• Ctrl + Mouse Wheel zooms canvas view</div>
       </div>
-    </div>
+    </CollapsibleSection>
   );
 };

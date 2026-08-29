@@ -377,6 +377,25 @@ export const PreferencesModal: React.FC<PreferencesModalProps> = ({
                   className="w-4 h-4 accent-emerald-600 cursor-pointer"
                 />
               </div>
+
+              {/* Direct Print with Margins Toggle */}
+              <div className="flex items-center justify-between pt-2 border-t border-sand-800/60">
+                <div>
+                  <div className="font-medium text-sand-200">Include Paper Margin Border in Print</div>
+                  <div className="text-[10px] text-sand-400">
+                    Print full physical sheet with solid papercraft margin borders (turn off to crop print to image area).
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={preferences.printWithMargins !== false}
+                  onChange={(e) => {
+                    const printWithMargins = e.target.checked;
+                    onUpdatePreferences(prev => ({ ...prev, printWithMargins }));
+                  }}
+                  className="w-4 h-4 accent-emerald-600 cursor-pointer"
+                />
+              </div>
             </div>
           </div>
 

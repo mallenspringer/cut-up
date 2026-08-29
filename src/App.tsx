@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useDeferredValue } from 'react';
 import { AppState, PreviewTab, WorkingImageState, LayerState } from './engine/types';
 import { createDefaultLayers } from './engine/layers/layerGenerator';
 import { createInitialHistory, pushHistorySnapshot, undoHistory, redoHistory, HistoryState } from './state/history';
@@ -6,11 +6,13 @@ import { UserPreferences, loadUserPreferences, saveUserPreferences } from './sta
 import { resampleWorkingImage } from './engine/working/transform';
 import { computeLuminance, extractAlpha } from './engine/luminance/luminance';
 import { filterBinaryMaskCanvas } from './engine/manufacturing/canvasFilter';
+import { cleanBinaryMaskDiscrete } from './engine/manufacturing/discreteClearance';
 import { generateLayerMask } from './engine/layers/layerGenerator';
 import { applyManualEditsToMask } from './engine/layers/manualEdits';
 import { traceBinaryMaskToSVG, calculateTurdSize, calculateAlphaMax, calculateOptTolerance } from './engine/vector/potraceEngine';
 import { convertToPixels, getPrintableArea } from './engine/layout/canvasLayout';
 import { extractImageDataFromImage, createSourceImageFromData } from './engine/source/sourceImage';
+import { applyAestheticFilter, DEFAULT_AESTHETIC_FILTER_STATE } from './engine/filters/filterEngine';
 
 import { CanvasViewport } from './ui/components/CanvasViewport';
 import { ImageTransformPanel } from './ui/components/ImageTransformPanel';
@@ -66,6 +68,7 @@ const DEFAULT_APP_STATE: AppState = {
     minimumFeatureSize: 2.0, // 2mm
     smoothing: 0,
   },
+  aestheticFilter: DEFAULT_AESTHETIC_FILTER_STATE,
   layers: createDefaultLayers(2),
   selectedLayerId: 'layer-1',
   output: {
@@ -179,10 +182,26 @@ export const App: React.FC = () => {
           },
         };
 
+        // Detect orientation from image dimensions
+        const isImageLandscape = img.naturalWidth > img.naturalHeight;
+        const orientation: 'portrait' | 'landscape' = isImageLandscape ? 'landscape' : 'portrait';
+        const canvasW = isImageLandscape
+          ? Math.max(state.canvas.width, state.canvas.height)
+          : Math.min(state.canvas.width, state.canvas.height);
+        const canvasH = isImageLandscape
+          ? Math.min(state.canvas.width, state.canvas.height)
+          : Math.max(state.canvas.width, state.canvas.height);
+
         const nextState: AppState = {
           ...state,
           sourceImage: source,
           workingImage: newWorkingImage,
+          canvas: {
+            ...state.canvas,
+            width: canvasW,
+            height: canvasH,
+            orientation,
+          },
           selectedLayerId: 'layer-1',
         };
 
@@ -235,14 +254,16 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Derived Processing Pipeline Computation via Potrace Vector Tracing Engine
-  const { layerPathDataMap, binaryMaskData, processingResolution } = useMemo(() => {
+  // Fast geometric signature of layers (excluding visual-only properties like color or solid backing)
+  const layerGeometricKey = state.layers
+    .map(l => `${l.id}:${l.order}:${l.threshold}:${JSON.stringify(l.manualEdits || {})}`)
+    .join('|');
+
+  // 1. Resample & Luminance Buffer Memoization (Only re-computes when image, position, scale, crop, or canvas size changes)
+  // 1a. Base Resample & Grayscale Luminance Memoization (Only re-computes when image, position, scale, crop, or canvas size changes)
+  const baseLuminanceData = useMemo(() => {
     if (!state.sourceImage || activeTab === 'source') {
-      return {
-        layerPathDataMap: new Map<string, string>(),
-        binaryMaskData: null,
-        processingResolution: { width: 400, height: 518 },
-      };
+      return null;
     }
 
     const { widthPx, heightPx, printableWidthPx, printableHeightPx } = getPrintableArea(state.canvas);
@@ -255,7 +276,7 @@ export const App: React.FC = () => {
       targetW = Math.round(maxDim * canvasAspect);
     }
 
-    // 1. Nearest-neighbor resample scaled into full canvas processing buffer
+    // Nearest-neighbor resample scaled into full canvas processing buffer
     const resampled = resampleWorkingImage(
       state.sourceImage,
       state.workingImage,
@@ -267,11 +288,11 @@ export const App: React.FC = () => {
       printableHeightPx
     );
 
-    // 2. Grayscale luminance conversion & alpha extraction
-    const luminance = computeLuminance(resampled);
+    // Grayscale luminance conversion & alpha extraction
+    const rawLuminance = computeLuminance(resampled);
     const alpha = extractAlpha(resampled);
 
-    // 3. Pixel density (px/mm)
+    // Pixel density (px/mm)
     const canvasWidthMm = state.canvas.unit === 'mm'
       ? state.canvas.width
       : state.canvas.unit === 'cm'
@@ -279,64 +300,173 @@ export const App: React.FC = () => {
         : state.canvas.width * 25.4;
     const pxPerMm = targetW / Math.max(1, canvasWidthMm);
 
-    // 4. Potrace vector parameters
-    const turdSize = calculateTurdSize(state.processing.minimumFeatureSize, pxPerMm);
-    const alphaMax = calculateAlphaMax(state.processing.smoothing);
-    const optTolerance = calculateOptTolerance(state.processing.smoothing);
+    return {
+      rawLuminance,
+      alpha,
+      targetW,
+      targetH,
+      pxPerMm,
+      imageBounds: resampled.imageBounds,
+    };
+  }, [
+    state.sourceImage,
+    state.workingImage,
+    state.canvas,
+    activeTab,
+  ]);
+
+  // 1b. Aesthetic Filter Discretization (Fast <2ms pass on cached grayscale buffer)
+  const luminanceBufferData = useMemo(() => {
+    if (!baseLuminanceData) return null;
+    const { rawLuminance, alpha, targetW, targetH, pxPerMm, imageBounds } = baseLuminanceData;
+
+    const luminance = applyAestheticFilter(rawLuminance, state.aestheticFilter, {
+      width: targetW,
+      height: targetH,
+      pxPerMm,
+      alpha,
+      imageBounds,
+    });
+
+    return {
+      luminance,
+      alpha,
+      targetW,
+      targetH,
+      pxPerMm,
+    };
+  }, [
+    baseLuminanceData,
+    state.aestheticFilter,
+  ]);
+
+  // Persistent Per-Layer Vector Path Cache (Key -> Traced SVG Path)
+  const vectorPathCacheRef = useRef<Map<string, string>>(new Map());
+  const prevLuminanceRef = useRef(luminanceBufferData);
+  if (prevLuminanceRef.current !== luminanceBufferData) {
+    prevLuminanceRef.current = luminanceBufferData;
+    vectorPathCacheRef.current.clear();
+  }
+
+  // Defer heavy multi-layer Potrace vector path tracing during rapid continuous slider dragging
+  const deferredLuminance = useDeferredValue(luminanceBufferData);
+  const deferredProcessing = useDeferredValue(state.processing);
+  const deferredFilter = useDeferredValue(state.aestheticFilter);
+
+  // 2. Derived Processing Pipeline Computation with Per-Layer Incremental Tracing
+  const { layerPathDataMap, binaryMaskData, processingResolution } = useMemo(() => {
+    const activeLuminanceData = deferredLuminance || luminanceBufferData;
+    if (!activeLuminanceData) {
+      return {
+        layerPathDataMap: new Map<string, string>(),
+        binaryMaskData: null,
+        processingResolution: { width: 400, height: 518 },
+      };
+    }
+
+    const { luminance, alpha, targetW, targetH, pxPerMm } = activeLuminanceData;
+    const processing = deferredProcessing || state.processing;
+    const filter = deferredFilter || state.aestheticFilter;
+
+    // Check if aesthetic filter is active
+    const isPixelate = filter?.enabled && filter?.type === 'pixelate';
+    const isVoronoi = filter?.enabled && filter?.type === 'voronoi';
+    const isAestheticActive = isPixelate || isVoronoi;
+
+    const cornerStyle = isPixelate
+      ? (filter?.pixelate?.cornerStyle ?? 'orthogonal')
+      : isVoronoi
+        ? (filter?.voronoi?.cornerStyle ?? 'orthogonal')
+        : 'rounded';
+
+    // When an aesthetic filter is active, use discrete topology clearance to keep block/facet edges intact
+    const useDiscreteClearance = isAestheticActive;
+    const effectiveClearance = processing.minimumFeatureSize;
+    const effectiveSmoothing = isAestheticActive ? 0 : processing.smoothing;
+
+    // Potrace vector parameters:
+    // - Orthogonal/Straight: alphaMax: 0.0, optCurve: false (Strict 90° sharp corners)
+    // - Rounded/Soft: alphaMax: 1.0, optCurve: true, optTolerance: 0.4 (Tapered slanted edges and gentle rounded corners)
+    // - Standard Organic: dynamic alphaMax & optTolerance derived from smoothing slider
+    const turdSize = calculateTurdSize(processing.minimumFeatureSize, pxPerMm);
+    const alphaMax = isAestheticActive
+      ? (cornerStyle === 'orthogonal' ? 0.0 : 1.0)
+      : calculateAlphaMax(effectiveSmoothing);
+    const optTolerance = isAestheticActive
+      ? (cornerStyle === 'orthogonal' ? 0.0 : 0.4)
+      : calculateOptTolerance(effectiveSmoothing);
+    const optCurve = isAestheticActive ? (cornerStyle === 'rounded') : true;
 
     const pathMap = new Map<string, string>();
     let selectedLayerImageData: ImageData | null = null;
     const activeLayerId = state.selectedLayerId || (state.layers[1] ? state.layers[1].id : state.layers[0]?.id);
 
     state.layers.forEach((layer: LayerState, idx: number) => {
-      // Binary mask thresholding
-      const rawMask = generateLayerMask(
-        luminance,
-        targetW,
-        targetH,
-        idx,
-        state.layers,
-        alpha
-      );
+      const cacheKey = `${layer.id}:${layer.threshold}:${effectiveClearance}:${effectiveSmoothing}:${cornerStyle}:${JSON.stringify(filter || {})}:${JSON.stringify(layer.manualEdits || {})}`;
+      let pathData = vectorPathCacheRef.current.get(cacheKey);
 
-      // Canvas 2D pre-filter for boundary smoothing & gap bridging
-      const cleanMask = filterBinaryMaskCanvas(
-        rawMask,
-        state.processing.minimumFeatureSize,
-        pxPerMm,
-        state.processing.smoothing
-      );
+      // If this is the active layer (for binary mask preview) or if path data is missing from cache, generate mask
+      if (!pathData || layer.id === activeLayerId) {
+        // Binary mask thresholding
+        const rawMask = generateLayerMask(
+          luminance,
+          targetW,
+          targetH,
+          idx,
+          state.layers,
+          alpha
+        );
 
-      // Apply manual touchups (Wand fills & Bridge capsules) ON TOP of cleaned mask
-      const finalMask = applyManualEditsToMask(
-        cleanMask,
-        layer.manualEdits,
-        targetW,
-        targetH,
-        pxPerMm
-      );
+        // 1. Pre-filter: discrete topology clearance keeps block/facet structure crisp without Gaussian melting
+        const baseCleanMask = useDiscreteClearance
+          ? cleanBinaryMaskDiscrete(rawMask, effectiveClearance, pxPerMm)
+          : filterBinaryMaskCanvas(
+              rawMask,
+              effectiveClearance,
+              pxPerMm,
+              effectiveSmoothing
+            );
 
-      if (layer.id === activeLayerId) {
-        const imgData = new ImageData(targetW, targetH);
-        for (let i = 0; i < finalMask.data.length; i++) {
-          const val = finalMask.data[i] === 1 ? 255 : 0;
-          imgData.data[i * 4] = val;
-          imgData.data[i * 4 + 1] = val;
-          imgData.data[i * 4 + 2] = val;
-          imgData.data[i * 4 + 3] = 255;
+        // 2. Corner geometry: if rounded aesthetic is selected, apply subtle corner chamfer/fillet
+        const cleanMask = (isAestheticActive && cornerStyle === 'rounded')
+          ? filterBinaryMaskCanvas(baseCleanMask, 0, pxPerMm, 40)
+          : baseCleanMask;
+
+        // Apply manual touchups (Wand fills & Bridge capsules) ON TOP of cleaned mask
+        const finalMask = applyManualEditsToMask(
+          cleanMask,
+          layer.manualEdits,
+          targetW,
+          targetH,
+          pxPerMm
+        );
+
+        if (layer.id === activeLayerId) {
+          const imgData = new ImageData(targetW, targetH);
+          for (let i = 0; i < finalMask.data.length; i++) {
+            const val = finalMask.data[i] === 1 ? 255 : 0;
+            imgData.data[i * 4] = val;
+            imgData.data[i * 4 + 1] = val;
+            imgData.data[i * 4 + 2] = val;
+            imgData.data[i * 4 + 3] = 255;
+          }
+          selectedLayerImageData = imgData;
         }
-        selectedLayerImageData = imgData;
+
+        if (!pathData) {
+          // Potrace Vector Tracing Engine (sharp 90° corners for orthogonal pixelation)
+          const vectorResult = traceBinaryMaskToSVG(finalMask, {
+            turdSize,
+            alphaMax,
+            optCurve,
+            optTolerance,
+          });
+          pathData = vectorResult.pathData;
+          vectorPathCacheRef.current.set(cacheKey, pathData);
+        }
       }
 
-      // Potrace Vector Tracing Engine
-      const vectorResult = traceBinaryMaskToSVG(finalMask, {
-        turdSize,
-        alphaMax,
-        optCurve: true,
-        optTolerance,
-      });
-
-      pathMap.set(layer.id, vectorResult.pathData);
+      pathMap.set(layer.id, pathData);
     });
 
     return {
@@ -344,7 +474,17 @@ export const App: React.FC = () => {
       binaryMaskData: selectedLayerImageData,
       processingResolution: { width: targetW, height: targetH },
     };
-  }, [state, activeTab]);
+  }, [
+    deferredLuminance,
+    luminanceBufferData,
+    deferredProcessing,
+    state.processing,
+    deferredFilter,
+    state.aestheticFilter,
+    layerGeometricKey,
+    state.selectedLayerId,
+    state.layers,
+  ]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-moss-950 text-slate-100">
@@ -359,7 +499,7 @@ export const App: React.FC = () => {
               Cut Up
             </h1>
             <span className="text-xs font-sans font-semibold text-black tracking-wide select-none">
-              V 1.1
+              V 1.2
             </span>
           </div>
         </div>

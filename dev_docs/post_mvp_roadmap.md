@@ -1,72 +1,70 @@
 # Cut Up — Post-MVP Development Roadmap & Checklist
 
-This document tracks upcoming feature milestones, architectural decisions, and technical specifications for updates following the initial MVP launch.
+This document tracks upcoming feature milestones, architectural decisions, and technical specifications for updates following the Cut Up v1.1 release.
 
 ---
 
 ## Roadmap Checklist
 
-- [ ] **1. Aesthetic Filter & Line Discretization System**
-- [ ] **2. Canvas Display & Direct-Print Preferences Modal**
-- [ ] **3. Interactive Wand Tool (Per-Layer Manual Island & Gap Cleanup)**
+- [x] **1. Canvas Display & Direct-Print Preferences Modal (Completed in v1.1)**
+- [x] **2. Interactive Touchup Suite — Wand & Bridge Pen (Completed in v1.0.1 / v1.1)**
+- [x] **3. Tactile Paper Simulation Engine — Bristol & Cold-Press (Completed in v1.1)**
+- [x] **4. Custom Export Dialog System — ZIP prefixes & Combined SVG naming (Completed in v1.1)**
+- [ ] **5. Curated Default Layer Color Palettes**
+- [ ] **6. Seamless Photographic Material Alpha Masks (Felt, Kraft, Construction Paper)**
+- [ ] **7. Aesthetic Filter & Line Discretization System (Pixel Block, Topo, Halftone)**
 
 ---
 
-## 1. Aesthetic Filter & Line Discretization System
+## 1. Curated Default Layer Color Palettes
 
 ### Objective
-Allow users to stylize the raw luminance cut patterns into distinct visual motifs (such as pixelated blocks, geometric low-poly facets, or flowing topographic contours) without slowing down the vector engine.
+Allow users to instantly restyle their entire paper stack using curated, harmonious multi-layer color palettes tailored for physical cardstock collections (rather than having to manually pick each layer's color individually).
+
+### Proposed Palettes:
+1. **Desaturated Rainbow (Default):** The classic ROYGBIV spectrum tuned for paper layers.
+2. **Monochrome Cardstock (Shades of Gray):** True grayscale paper progression from pure white top sheet down to charcoal/black foundation.
+3. **Warm Earth & Woodgrain:** Terracotta, ochre, sienna, espresso, and creamy ivory.
+4. **Cyberpunk Neon:** Vibrant electric magenta, cyan, ultraviolet, lime, and deep void black.
+5. **Botanical Forest:** Moss greens, sage, deep pine, eucalyptus, and pale birch.
+6. **Vintage Pastel / Risograph:** Soft peach, dusty rose, mint, lavender, and buttercup yellow.
+7. **Desert Dune:** Warm sandstones, terracotta, burnt orange, and pale limestone.
+
+### Key Capabilities:
+- **Palette Selector Dropdown / Swatches:** Located in the Layer Manager header or Settings menu.
+- **Dynamic Layer Interpolation:** Automatically distributes the selected color scheme smoothly across however many layers ($2$ to $11$) are currently in the stack.
+- **Per-Layer Override Retention:** Users can still click individual layer swatches to customize specific sheets after applying a palette.
+
+---
+
+## 2. Seamless Photographic Material Alpha Masks
+
+### Objective
+Expand the tactile paper simulation engine with custom macro-photographed alpha textures for high-tooth materials like **Craft Felt**, **Construction Paper**, **Heavy Kraft Cardstock**, and **Rough Deckle Rag**.
+
+### Reference Specification:
+See [`dev_docs/tactile_texture_capture_spec.md`](./tactile_texture_capture_spec.md) for full studio lighting, GIMP Color-to-Alpha processing, and SVG pattern integration workflows.
+
+---
+
+## 3. Aesthetic Filter & Line Discretization System
+
+### Objective
+Allow users to stylize the raw luminance cut patterns into distinct visual motifs (such as pixelated blocks or geometric low-poly facets) without slowing down the vector engine.
 
 ### Implementation Summary
-- **Raster-Space Processing:** Filters run directly on the resampled luminance buffer prior to thresholding and vectorization.
+- **Raster-Space Processing:** Filters run directly on the resampled luminance buffer prior to thresholding and vectorization in $< 1\text{ms}$.
 - **Filters Included:**
-  1. **Pixel Block / Voxel Mosaic (Priority 1):** Rectilinear quantization into clean 90° orthogonal cuts ($1\text{ mm}$–$15\text{ mm}$ block size).
-  2. **Low-Poly / Voronoi Facets:** Geometric polygonal cell mesh with straight line segment boundaries.
-  3. **Topographic / Elevation Curves:** Smooth multi-pass contour elevation map style.
-  4. **Woodcut / Engraving Ribbons:** Modulated parallel scanline louvers.
-  5. **Hexagonal Honeycomb:** Isometric hexagonal tiling.
-  6. **Halftone Dot Matrix:** Pop-art dot/diamond growth screens.
+  1. **Pixel Block / Voxel Mosaic:** Rectilinear quantization into clean 90° orthogonal cuts ($1\text{ mm}$–$15\text{ mm}$ block size) with Mean/Median sampling and Grid Snap.
+  2. **Low-Poly / Voronoi Facets:** Geometric polygonal cell mesh with straight line segment boundaries, PRNG jitter slider ($0\%$ honeycomb to $100\%$ shards), and seed shuffle.
 - **Reference Specification:** See [`dev_docs/aesthetic_filters_spec.md`](./aesthetic_filters_spec.md) for full algorithmic formulas.
 
 ---
 
-## 2. Canvas Display & Direct-Print Preferences Modal
+## Completed Milestones (v1.1.0)
 
-### Objective
-Provide an "Options / Preferences" modal for customizing on-screen visual presentation, workflow guidelines, and browser direct-print aesthetics without bloating or altering core machine SVG cut exports.
-
-### Key Capabilities & Settings
-- **Enhanced Visual Simulation & Print Pop:**
-  - **Layer Drop Shadows:** Adjustable simulated shadow depth ($0\text{px}$ to $16\text{px}$), darkness ($0\%$ to $70\%$), and custom color tint between sheets in Composite View. Makes physical stack depth pop dramatically when printing or exporting image snapshots directly from the browser.
-  - **Ambient Paper Texture / Lighting:** Planned subtle tactile paper grain overlay in Composite simulation.
-- **Workflow & Workbench Styles:**
-  - **Canvas Backdrop Themes:** Switch workbench background between *Drafting Grid* (ivory dot matrix), *Cutting Mat* (workshop green grid), or *Neutral Gray* (18% photo gray).
-  - **Privacy & Session Storage:** Optional client-side preference persistence with first-visit consent banner and instant reset-to-defaults.
-- **Non-Interference Guarantee:** These settings apply exclusively to viewport rendering and direct browser printing; raw machine SVG exports remain strictly 1:1, unit-accurate, and unbloated.
-
----
-
-## 3. Interactive Wand Tool (Per-Layer Manual Cleanup)
-
-### Objective
-Give artists semi-manual, surgical control over specific islands, holes, or high-noise areas on individual layers without needing to raise global minimum clearance or contour smoothing sliders (which affects the entire project).
-
-### Key Capabilities & Workflow
-- **Targeted Selection & Repair:**
-  - **Interactive Tool Modes:**
-    - **Bridge / Seal Gap:** Click-drag a gesture across a thin neck or gap to bridge material and reinforce structural integrity on that specific layer.
-    - **Remove Island:** Click an unwanted floating scrap or speckle to delete it from the active layer mask.
-    - **Fill Hole:** Click a hole or void to fill it solid on that specific layer.
-- **Non-Destructive Layer Mask Overlays:**
-  - Manual edits are stored as delta masks / vector patches associated with the specific `layer.id`.
-  - Global image adjustments (crop, position, scale) can re-rasterize the base while maintaining manual user touchups.
-- **Selective Fidelity:**
-  - Allows an artist to preserve intricate, high-frequency facial or text details on one layer while selectively wiping out clutter or bridging weak tabs on another layer.
-
----
-
-## Milestone Execution Order
-
-1. **Phase 1: Aesthetic Filters Engine (Pixel Block & Topo first)**
-2. **Phase 2: Display & Print Preferences Modal**
-3. **Phase 3: Interactive Wand / Manual Patch Tool**
+1. **Workspace Preferences & Persistence:** Client-side preference storage with cookie consent modal, factory reset, and workbench themes (*Drafting Pad*, *Cutting Mat*, *Neutral Gray*).
+2. **Interactive Touchup Suite:** Topology-safe Island/Hole Wand deletion and Bridge Pen gap reinforcement.
+3. **Tactile Paper Simulation:** Strict silhouette alpha-clipped Hot-Press Bristol and Cold-Press Watercolor shaders with per-layer GPU noise seeds.
+4. **Direct Browser Print Engine:** Dedicated `@media print` isolation and `@page` 1:1 dimension matching.
+5. **Custom Export Dialog:** Configurable file prefixes and custom combined SVG naming.

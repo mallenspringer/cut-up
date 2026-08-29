@@ -2,15 +2,18 @@ import React from 'react';
 import { AppState, LayerState } from '../../engine/types';
 import { Layers, Plus, Trash2, Wand2 } from 'lucide-react';
 import { generateAutoThresholds, DEFAULT_LAYER_COLORS, enforceMonotonicThresholds, updateLayerThreshold } from '../../engine/layers/layerGenerator';
+import { CollapsibleSection } from './CollapsibleSection';
 
 interface LayerManagerPanelProps {
   state: AppState;
   onUpdateState: (updater: (prev: AppState) => AppState) => void;
+  defaultOpen?: boolean;
 }
 
 export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
   state,
   onUpdateState,
+  defaultOpen = true,
 }) => {
   const { layers } = state;
   const sortedLayers = [...layers].sort((a, b) => a.order - b.order);
@@ -60,7 +63,8 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
       ...layer,
       threshold: autoThresholds[idx],
     }));
-    onUpdateState(prev => ({ ...prev, layers: updated }));
+    const rebalanced = enforceMonotonicThresholds(updated);
+    onUpdateState(prev => ({ ...prev, layers: rebalanced }));
   };
 
   // Toggle Solid Backing vs Void on Layer 0
@@ -72,31 +76,32 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
   };
 
   return (
-    <div className="p-4 space-y-4 border-b border-sand-800/70">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-sand-300 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-emerald-400" /> Layers ({layers.length}/11)
-        </h3>
-
-        <div className="flex items-center gap-2">
+    <CollapsibleSection
+      title={`Layers (${layers.length}/11)`}
+      icon={<Layers className="w-4 h-4" />}
+      defaultOpen={defaultOpen}
+      badge={
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
+            type="button"
             onClick={handleAutoDistribute}
-            className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition"
+            className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-sand-800/60 transition"
             title="Auto distribute cut thresholds evenly"
           >
             <Wand2 className="w-3 h-3" /> Auto
           </button>
           <button
+            type="button"
             onClick={handleAddLayer}
             disabled={layers.length >= 11}
-            className="btn btn-sm btn-secondary text-sand-200 disabled:opacity-30 disabled:pointer-events-none"
+            className="text-[11px] bg-sand-800/80 hover:bg-sand-700 text-sand-200 px-1.5 py-0.5 rounded border border-sand-700/60 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1 transition"
             title="Add new cut layer (up to 10 cut layers + Layer 0 base)"
           >
-            <Plus className="w-3.5 h-3.5" /> Layer
+            <Plus className="w-3 h-3" /> Add
           </button>
         </div>
-      </div>
-
+      }
+    >
       <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
         {/* Render Top Layer (highest order) down to Bottom Layer (Layer 0) */}
         {[...sortedLayers].reverse().map((layer, reverseIdx) => {
@@ -259,6 +264,6 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
           );
         })}
       </div>
-    </div>
+    </CollapsibleSection>
   );
 };

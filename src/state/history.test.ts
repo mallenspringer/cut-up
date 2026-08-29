@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createInitialHistory, pushHistorySnapshot, undoHistory, redoHistory } from './history';
 import { AppState, WorkingImageState } from '../engine/types';
 import { createDefaultLayers } from '../engine/layers/layerGenerator';
+import { DEFAULT_AESTHETIC_FILTER_STATE } from '../engine/filters/filterEngine';
 
 const MOCK_WORKING_IMAGE: WorkingImageState = {
   crop: { type: 'rectangle', geometry: { x: 0, y: 0, width: 400, height: 400 } },
@@ -17,6 +18,7 @@ const MOCK_INITIAL_STATE: AppState = {
   workingImage: MOCK_WORKING_IMAGE,
   canvas: { width: 8.5, height: 11, unit: 'in', margin: 0.25, orientation: 'portrait' },
   processing: { minimumFeatureSize: 2.0, smoothing: 0 },
+  aestheticFilter: DEFAULT_AESTHETIC_FILTER_STATE,
   layers: createDefaultLayers(2),
   selectedLayerId: 'layer-1',
   output: { registrationMarks: false, exportMode: 'combined' },

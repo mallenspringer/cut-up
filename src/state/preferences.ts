@@ -8,6 +8,7 @@ export interface UserPreferences {
   layerShadowOpacity: number; // 0.0 to 0.7 (default: 0.25)
   layerShadowColor: string; // default: '#000000'
   printWithShadows: boolean; // default: false (clean physical prints)
+  printWithMargins: boolean; // default: true (full sheet with paper border vs. cropped image)
 
   // Active Defaults
   defaultUnit: 'in' | 'mm' | 'cm'; // default: 'in'
@@ -17,8 +18,8 @@ export interface UserPreferences {
   backdropTheme: 'drafting' | 'cutting_mat' | 'clean_gray';
   paperTexture: 'off' | 'smooth_bristol' | 'cold_press';
   textureStrengths: {
-    smooth_bristol: number; // 0.05 to 1.0 (default: 0.35)
-    cold_press: number;     // 0.05 to 1.0 (default: 0.50)
+    smooth_bristol: number; // 0.05 to 1.0 (default: 0.10)
+    cold_press: number;     // 0.05 to 1.0 (default: 0.10)
   };
 }
 
@@ -30,6 +31,7 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   layerShadowOpacity: 0.25,
   layerShadowColor: '#000000',
   printWithShadows: false,
+  printWithMargins: true,
 
   defaultUnit: 'in',
   defaultBridgeWidthMm: 2.0,
